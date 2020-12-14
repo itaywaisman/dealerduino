@@ -7,8 +7,9 @@
 #include <Wire.h>
 #include "VL53L1X.h"
 #include <SoftwareSerial.h>
-#include "ESP8266.h"
-#include "FirebaseArduino.h"
+#include "FirebaseESP8266.h"
+#include <ESP8266WiFi.h>
+
 
 // "http://librarymanager/All#SparkFun_VL53L1X
 
@@ -55,47 +56,44 @@ VL53L1X distance_sensor;
 Servo card_flipping_servo;
 Servo platform_rotation_servo;
 
+FirebaseData commandData;
+FirebaseData dealOpenData;
+
+
 void setup_wifi() {
-    ser.begin(9600);
+    Serial.begin(115200);
 
-    ser.begin(9600);
-
-    Serial.print("FW Version:");
-    Serial.println(wifi.getVersion().c_str());
-
-    if (wifi.setOprToStationSoftAP()) {
-        Serial.print(F("to station + softap ok\r\n"));
-    } else {
-        Serial.print(F("to station + softap err\r\n"));
-    }
-    if (wifi.joinAP(SSID, WIFI_PASS))
+    WiFi.begin(SSID, WIFI_PASS);
+    Serial.print("Connecting to Wi-Fi");
+    while (WiFi.status() != WL_CONNECTED)
     {
-        Serial.print(F("Join AP success\r\n"));
-        Serial.print(F("IP: "));
-        Serial.println(wifi.getLocalIP().c_str());
+        Serial.print(".");
+        delay(300);
     }
-    else
-    {
-        Serial.print(F("Join AP failure\r\n"));
-        while(1);
-    }
+    Serial.println();
+    Serial.print("Connected with IP: ");
+    Serial.println(WiFi.localIP());
+    Serial.println();
 
-    if (wifi.disableMUX())
-    {
-        Serial.print(F("single ok\r\n"));
-    }
-    else
-    {
-        Serial.print(F("single err\r\n"));
-    }
-    Serial.print(F("setup end\r\n"));
-    delay(2000);
-
-}
-
-void setup_firebase() {
     Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+    Firebase.reconnectWiFi(true);
+
+    //Set the size of WiFi rx/tx buffers in the case where we want to work with large data.
+    commandData.setBSSLBufferSize(1024, 1024);
+
+    //Set the size of HTTP response buffers in the case where we want to work with large data.
+    commandData.setResponseSize(1024);
+
+
+    //Set the size of WiFi rx/tx buffers in the case where we want to work with large data.
+    dealOpenData.setBSSLBufferSize(1024, 1024);
+
+    //Set the size of HTTP response buffers in the case where we want to work with large data.
+    dealOpenData.setResponseSize(1024);
+
+
 }
+
 
 void setup_dc_motors() {
     pinMode(enA, OUTPUT);
@@ -267,16 +265,24 @@ void deal_card(boolean is_open) {
 void loop() {
 
 
-    int command = Firebase.getInt("command");
-    int deal_open = Firebase.getInt("deal_open");
-    Serial.print("Got command:")
-    Serial.print(command);
-    Serial.println();
+    if(Firebase.getInt(commandData, "/command"))
+    {
+        int command = commandData.intData();
 
-    switch (command) {
-        case DEAL_CARD:
-            deal_card(deal_open == 0);
-        default:
+
+        switch (command) {
+            case DEAL_CARD:
+                deal_card(true);
+            default:
+        }
+
+
+    }else{
+
+  //Failed?, get the error reason from firebaseData
+
+        Serial.print("Error in get, ");
+        Serial.println(commandData.errorReason());
     }
 
     delay(500);
