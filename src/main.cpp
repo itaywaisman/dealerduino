@@ -34,17 +34,37 @@
 
 enum DEALER_COMMANDS {
     DO_NOTHING = 0,
-    SCAN_PLAYERS = 1,
-    DEAL_CARD = 2,
+    START_GAME = 1,
+    SCAN_PLAYERS = 2,
+    START_ROUND = 3,
+    SHOW_CARD = 4,
+    PLAYER_QUIT = 5,
+    RESET = 9
 };
 
+enum GAME_STATE {
+    NOT_STARTED = 0,
+    STARTED = 1,
+    ROUND_STARTED = 2,
+    DEALT_CARD_1 = 12,
+    DEALT_CARD_2 = 13,
+    DEALT_CARD_3 = 14,
+    DEALT_CARD_4 = 15,
+    ROUND_FINISHED = 16,
+};
 
-SoftwareSerial ser(RX,TX);
+String serialResponse; // complete message from arduino, which consists of snesors data
+char sample_packet[] = "0;0;0;0;0";
+
+/// GAME STATE
+int game_state = NOT_STARTED;
+int player_angles[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
 
 VL53L1X distance_sensor;
 
 Servo card_flipping_servo;
 Servo platform_rotation_servo;
+
 
 
 void setup_dc_motors() {
@@ -119,8 +139,8 @@ void set_card_flipper_flip() {
     card_flipping_servo.write(CARD_FLIPPER_FLIP);
 }
 
-void rotate_platform(int deg) {
-    platform_rotation_servo.write(deg);
+void rotate_platform(int target_degree) {
+    platform_rotation_servo.write(target_degree);
     delay(15);                       // waits 15ms for the servo to reach the position
 }
 
@@ -141,6 +161,10 @@ int read_color_sensor(){
 /*********************************
  * Game logic methods
  *********************************/
+
+void start_game() {
+    game_state = STARTED;
+}
 
 boolean is_player_detected() {
     return abs(read_proximity_sensor() - PROXIMITY_DISTANCE) < PROXIMITY_DELTA;
@@ -167,22 +191,28 @@ boolean is_card_facing_up() {
     return blue_value > 22 and green_value > 40 and red_value > 50;
 }
 
-void detect_cards() {
+void detect_players() {
+    int player_idx = 0;
     for (int pos = 180; pos >= 0; pos -= 1) { // goes from 180 degrees to 0 degrees
         rotate_platform(pos);
         if(is_player_detected()) {
-            Serial.write("DETECTED PLAYER");
-            // save degree to FIREBASE
+            player_angles[player_idx] = pos;
+            player_idx++;
         }
     }
+
+    rotate_platform(90);
 }
 
-void deal_regular() {
+void deal_regular(int target_angle) {
     spin_cards_wheel(2000);
     delay(200);
 }
 
-void deal_flipped() {
+void deal_flipped(int target_angle) {
+
+    rotate_platform(360 - target_angle);
+
     set_card_flipper_insert();
     delay(1000);
     spin_cards_wheel(2000);
@@ -193,21 +223,57 @@ void deal_flipped() {
     delay(500);
 }
 
-void deal_card(boolean is_open) {
+void deal_card(boolean is_open, int target_angle) {
+
     boolean card_facing_up = is_card_facing_up();
+
     if(is_open && card_facing_up) {
-        deal_regular();
+        deal_regular(target_angle);
     }
     if(is_open && !card_facing_up) {
-        deal_flipped();
+        deal_flipped(target_angle);
     }
     if(!is_open && card_facing_up) {
-        deal_flipped();
+        deal_flipped(target_angle);
     }
     if(!is_open && !card_facing_up) {
-        deal_regular();
+        deal_regular(target_angle);
     }
 }
+
+void show_card() {
+    deal_card(true, 90);
+    game_state = game_state + 1;
+
+}
+
+void start_round() {
+    for(int i = 0; i < 8; i++) {
+        if(player_angles[i] >= 0) {
+
+            deal_card(false, player_angles[i]);
+            deal_card(false, player_angles[i]);
+            
+        }
+    }
+    game_state = ROUND_STARTED;
+}
+
+void player_quit(int player_idx) {
+    player_angles[player_idx] = -1;
+}
+
+void reset() {
+    game_state = NOT_STARTED;
+    for(int i = 0; i < 8; i++) {
+        player_angles[i] = -1;
+    }
+}
+
+void sync_game_state() {
+    Serial.print("STATE " + game_state);
+}
+
 
 /*********************************
  * Loop
@@ -215,18 +281,52 @@ void deal_card(boolean is_open) {
 
 void loop() {
 
+    if (Serial.available() > 0 ) 
+    {
+        serialResponse = Serial.readStringUntil('\r\n');
 
-    int command = Firebase.getInt("command");
-    int deal_open = Firebase.getInt("deal_open");
-    Serial.print("Got command:")
-    Serial.print(command);
-    Serial.println();
+        char buf[sizeof(sample_packet)];
+        serialResponse.toCharArray(buf, sizeof(buf));
 
-    switch (command) {
-        case DEAL_CARD:
-            deal_card(deal_open == 0);
-        default:
+        char *p = buf;
+        char *str;
+        int parts [5];
+        int current_part = 0;
+        while ((str = strtok_r(p, ";", &p)) != NULL) { // delimiter is the semicolon
+            parts[current_part] = String(str).toInt();
+            current_part++;
+        }
+
+        int command = parts[0];
+        int arg1 = parts[1];
+        // int arg2 = parts[2];
+        // int arg3 = parts[3];
+        // int arg4 = parts[4];
+
+        switch (command) {
+            case START_GAME:
+                start_game();
+                break;
+            case SCAN_PLAYERS:
+                detect_players();
+                break;
+            case START_ROUND:
+                start_round();
+                break;
+            case SHOW_CARD:
+                show_card();
+                break;
+            case PLAYER_QUIT:
+                int player_idx = arg1;
+                player_quit(player_idx);
+                break;
+            case RESET:
+                reset();
+                break;
+        }
+
+        sync_game_state();
+        
+
     }
-
-    delay(500);
 }
