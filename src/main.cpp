@@ -7,8 +7,6 @@
 #include <Wire.h>
 #include "VL53L1X.h"
 #include <SoftwareSerial.h>
-#include "ESP8266.h"
-#include "FirebaseArduino.h"
 
 // "http://librarymanager/All#SparkFun_VL53L1X
 
@@ -34,12 +32,6 @@
 #define PROXIMITY_DISTANCE 1000
 #define PROXIMITY_DELTA 200
 
-#define SSID "BezeqWiFi51"
-#define WIFI_PASS "q1w2e3r4"
-
-#define FIREBASE_HOST "https://dealerduino-default-rtdb.firebaseio.com"
-#define FIREBASE_AUTH "AIzaSyB3Ls1UACtiIUWYpg56qwFP_mt96uR8bIg"
-
 enum DEALER_COMMANDS {
     DO_NOTHING = 0,
     SCAN_PLAYERS = 1,
@@ -48,54 +40,12 @@ enum DEALER_COMMANDS {
 
 
 SoftwareSerial ser(RX,TX);
-ESP8266 wifi(ser)
 
 VL53L1X distance_sensor;
 
 Servo card_flipping_servo;
 Servo platform_rotation_servo;
 
-void setup_wifi() {
-    ser.begin(9600);
-
-    ser.begin(9600);
-
-    Serial.print("FW Version:");
-    Serial.println(wifi.getVersion().c_str());
-
-    if (wifi.setOprToStationSoftAP()) {
-        Serial.print(F("to station + softap ok\r\n"));
-    } else {
-        Serial.print(F("to station + softap err\r\n"));
-    }
-    if (wifi.joinAP(SSID, WIFI_PASS))
-    {
-        Serial.print(F("Join AP success\r\n"));
-        Serial.print(F("IP: "));
-        Serial.println(wifi.getLocalIP().c_str());
-    }
-    else
-    {
-        Serial.print(F("Join AP failure\r\n"));
-        while(1);
-    }
-
-    if (wifi.disableMUX())
-    {
-        Serial.print(F("single ok\r\n"));
-    }
-    else
-    {
-        Serial.print(F("single err\r\n"));
-    }
-    Serial.print(F("setup end\r\n"));
-    delay(2000);
-
-}
-
-void setup_firebase() {
-    Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
-}
 
 void setup_dc_motors() {
     pinMode(enA, OUTPUT);
@@ -135,11 +85,10 @@ void setup() {
     Wire.begin();
     Wire.setClock(400000); // use 400 kHz I2C
 
-    setup_wifi();
-//    setup_dc_motors();
-//    setup_servos();
+    setup_dc_motors();
+    setup_servos();
     setup_proximity_sensor();
-//    setup_color_sensor();
+    setup_color_sensor();
 }
 
 
