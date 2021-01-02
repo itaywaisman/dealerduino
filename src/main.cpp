@@ -4,9 +4,11 @@
 
 #include "Arduino.h"
 #include <Servo.h>
+#include <Stepper.h>
 #include <Wire.h>
 #include "VL53L1X.h"
 #include <SoftwareSerial.h>
+
 
 // "http://librarymanager/All#SparkFun_VL53L1X
 
@@ -22,7 +24,7 @@
 #define in3 6
 #define in4 7
 
-#define CARD_FLIPPING_OUT 3
+#define CARD_FLIPPING_OUT 6
 #define PLATFORM_ROTATION_OUT 4
 
 #define CARD_FLIPPER_REGULAR 100
@@ -53,6 +55,9 @@ enum GAME_STATE {
     ROUND_FINISHED = 16,
 };
 
+
+
+
 String serialResponse; // complete message from arduino, which consists of snesors data
 char sample_packet[] = "0;0;0;0;0";
 
@@ -63,8 +68,17 @@ int player_angles[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
 VL53L1X distance_sensor;
 
 Servo card_flipping_servo;
-Servo platform_rotation_servo;
 
+
+// Number of steps per output rotation
+const int stepsPerRevolution = 200;
+
+// Create Instance of Stepper library
+Stepper baseStepper(stepsPerRevolution, 8, 9, 10, 11);
+
+setup_stepper_motors(){
+    baseStepper.setSpeed(60);
+}
 
 
 void setup_dc_motors() {
@@ -95,20 +109,7 @@ void setup_color_sensor() {
 void setup_servos() {
 
     card_flipping_servo.attach(CARD_FLIPPING_OUT);
-    platform_rotation_servo.attach(PLATFORM_ROTATION_OUT);
 
-}
-
-void setup() {
-
-    Serial.begin(9600);
-    Wire.begin();
-    Wire.setClock(400000); // use 400 kHz I2C
-
-    setup_dc_motors();
-    setup_servos();
-    setup_proximity_sensor();
-    setup_color_sensor();
 }
 
 
@@ -135,13 +136,31 @@ void set_card_flipper_insert() {
     card_flipping_servo.write(CARD_FLIPPER_INSERT);
 }
 
-void set_card_flipper_flip() {
-    card_flipping_servo.write(CARD_FLIPPER_FLIP);
+void rotate_card_flipper(int degree) {
+    card_flipping_servo.write(0);
+    delay(500);
+    card_flipping_servo.write(93);
+    delay(1000);
 }
 
 void rotate_platform(int target_degree) {
-    platform_rotation_servo.write(target_degree);
-    delay(15);                       // waits 15ms for the servo to reach the position
+    // step one revolution in one direction:
+    Serial.println("clockwise");
+    baseStepper.step(stepsPerRevolution);
+    digitalWrite(8, LOW);
+    digitalWrite(9, LOW);
+    digitalWrite(10, LOW);
+    digitalWrite(11, LOW);
+    delay(5000);
+
+    // step one revolution in the other direction:
+    Serial.println("counterclockwise");
+    baseStepper.step(-stepsPerRevolution);
+    digitalWrite(8, LOW);
+    digitalWrite(9, LOW);
+    digitalWrite(10, LOW);
+    digitalWrite(11, LOW);
+    delay(5000);
 }
 
 int read_proximity_sensor() {
@@ -217,7 +236,7 @@ void deal_flipped(int target_angle) {
     delay(1000);
     spin_cards_wheel(2000);
     delay(500);
-    set_card_flipper_flip();
+    //set_card_flipper_flip();
     delay(500);
     set_card_flipper_regular();
     delay(500);
@@ -253,7 +272,7 @@ void start_round() {
 
             deal_card(false, player_angles[i]);
             deal_card(false, player_angles[i]);
-            
+
         }
     }
     game_state = ROUND_STARTED;
@@ -276,12 +295,29 @@ void sync_game_state() {
 
 
 /*********************************
+ * Setup
+ *********************************/
+void setup() {
+    Serial.begin(9600);
+    Wire.begin();
+    Wire.setClock(400000); // use 400 kHz I2C
+    setup_stepper_motors();
+    setup_servos();
+//    setup_dc_motors();
+//    setup_proximity_sensor();
+//    setup_color_sensor();
+}
+
+/*********************************
  * Loop
  *********************************/
-
 void loop() {
+    //rotate_platform(1);
+    //rotate_card_flipper(45);
 
-    if (Serial.available() > 0 ) 
+
+
+    if (Serial.available() > 0 )
     {
         serialResponse = Serial.readStringUntil('\r\n');
 
@@ -326,7 +362,8 @@ void loop() {
         }
 
         sync_game_state();
-        
+
 
     }
+
 }
