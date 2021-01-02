@@ -51,14 +51,17 @@ enum GAME_STATE {
     DEALT_CARD_3 = 14,
     DEALT_CARD_4 = 15,
     ROUND_FINISHED = 16,
+    ERROR = 100
 };
 
+SoftwareSerial ArduinoUnoSerial(0,1);
 String serialResponse; // complete message from arduino, which consists of snesors data
-char sample_packet[] = "0;0;0;0;0";
+char sample_packet[] = "0;0;0";
 
 /// GAME STATE
 int game_state = NOT_STARTED;
 int player_angles[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
+int player_num = 0;
 
 VL53L1X distance_sensor;
 
@@ -109,6 +112,8 @@ void setup() {
     setup_servos();
     setup_proximity_sensor();
     setup_color_sensor();
+
+    ArduinoUnoSerial.begin(4800);
 }
 
 
@@ -201,6 +206,8 @@ void detect_players() {
         }
     }
 
+    player_num = player_idx;
+
     rotate_platform(90);
 }
 
@@ -271,7 +278,8 @@ void reset() {
 }
 
 void sync_game_state() {
-    Serial.print("STATE " + game_state);
+    Serial.printf('%d;%d', game_state, player_num);
+    Serial.println();
 }
 
 
@@ -281,9 +289,9 @@ void sync_game_state() {
 
 void loop() {
 
-    if (Serial.available() > 0 ) 
+    if (ArduinoUnoSerial.available() > 0 ) 
     {
-        serialResponse = Serial.readStringUntil('\r\n');
+        serialResponse = ArduinoUnoSerial.readStringUntil('\r\n');
 
         char buf[sizeof(sample_packet)];
         serialResponse.toCharArray(buf, sizeof(buf));
@@ -299,9 +307,7 @@ void loop() {
 
         int command = parts[0];
         int arg1 = parts[1];
-        // int arg2 = parts[2];
-        // int arg3 = parts[3];
-        // int arg4 = parts[4];
+        int arg2 = parts[2];
 
         switch (command) {
             case START_GAME:
