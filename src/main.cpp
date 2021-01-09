@@ -292,7 +292,9 @@ void reset() {
 }
 
 void sync_game_state() {
-    Serial.printf('%d;%d', game_state, player_num);
+    Serial.print(game_state);
+    Serial.print(';');
+    Serial.print(player_num);
     Serial.println();
 }
 
