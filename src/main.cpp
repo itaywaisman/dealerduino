@@ -12,24 +12,40 @@
 
 // "http://librarymanager/All#SparkFun_VL53L1X
 
-#define s0 4       //Module pins wiring
-#define s1 5
-#define s2 6
-#define s3 7
-#define out 8
+//START COLOR SENSOR :
+#define s0 2       //Module pins wiring
+#define s1 3
+#define s2 4
+#define s3 5
+#define out 6
+//END COLOR SENSOR !
+
 //
 #define enA 12
-#define in1 12
-#define in2 13
-#define in3 6
-#define in4 7
+#define in1 1
+#define in2 2
+#define in3 3
+#define in4 4
+#define in5 5
+#define in6 6
+#define in7 7
+#define in7 8
+#define in7 9
+#define in7 10
+#define in7 11
+#define in12 12
+#define in13 13
 
-#define CARD_FLIPPING_OUT 6
+#define CARD_FLIPPING_OUT 7
+#define PLATFORM_OUT_1 8
+#define PLATFORM_OUT_2 9
+#define PLATFORM_OUT_3 10
+#define PLATFORM_OUT_4 11
+#define CARD_PUSHER_OUT 12
 #define PLATFORM_ROTATION_OUT 4
 
-#define CARD_FLIPPER_REGULAR 100
-#define CARD_FLIPPER_INSERT 110
-#define CARD_FLIPPER_FLIP 0
+#define CARD_FLIPPER_REGULAR 0
+#define CARD_FLIPPER_INSERT 180
 
 #define PROXIMITY_DISTANCE 1000
 #define PROXIMITY_DELTA 200
@@ -68,23 +84,20 @@ int player_num = 0;
 VL53L1X distance_sensor;
 
 Servo card_flipping_servo;
-
+Servo card_pusher_servo;
 
 // Number of steps per output rotation
 const int stepsPerRevolution = 200;
 
 // Create Instance of Stepper library
-Stepper baseStepper(stepsPerRevolution, 8, 9, 10, 11);
-
-setup_stepper_motors(){
-    baseStepper.setSpeed(60);
-}
+Stepper baseStepper(stepsPerRevolution, PLATFORM_OUT_1, PLATFORM_OUT_2, PLATFORM_OUT_3, PLATFORM_OUT_4);
+int current_degree = 0;
 
 
 void setup_dc_motors() {
     pinMode(enA, OUTPUT);
-    pinMode(in1, OUTPUT);
-    pinMode(in2, OUTPUT);
+    pinMode(0, OUTPUT);
+    pinMode(1, OUTPUT);
     pinMode(in3, OUTPUT);
     pinMode(in4, OUTPUT);
 }
@@ -107,9 +120,8 @@ void setup_color_sensor() {
 }
 
 void setup_servos() {
-
     card_flipping_servo.attach(CARD_FLIPPING_OUT);
-
+    card_pusher_servo.attach(CARD_PUSHER_OUT);
 }
 
 
@@ -119,12 +131,14 @@ void setup_servos() {
 
 
 void spin_cards_wheel(int ms=1000) {
-    digitalWrite(in1, HIGH);
-    digitalWrite(in2, LOW);
+  //not working yet !!!
+    Serial.print("SPIN MOTOR!");
+    digitalWrite(0, HIGH);
+    digitalWrite(1, LOW);
     delay(ms);
 
-    digitalWrite(in1, LOW);
-    digitalWrite(in2, LOW);
+    digitalWrite(0, LOW);
+    digitalWrite(1, LOW);
     delay(ms);
 }
 
@@ -132,35 +146,23 @@ void set_card_flipper_regular() {
     card_flipping_servo.write(CARD_FLIPPER_REGULAR);
 }
 
-void set_card_flipper_insert() {
+void set_card_flipper_flipped() {
     card_flipping_servo.write(CARD_FLIPPER_INSERT);
 }
 
-void rotate_card_flipper(int degree) {
-    card_flipping_servo.write(0);
-    delay(500);
-    card_flipping_servo.write(93);
-    delay(1000);
-}
-
 void rotate_platform(int target_degree) {
-    // step one revolution in one direction:
-    Serial.println("clockwise");
-    baseStepper.step(stepsPerRevolution);
-    digitalWrite(8, LOW);
-    digitalWrite(9, LOW);
-    digitalWrite(10, LOW);
-    digitalWrite(11, LOW);
-    delay(5000);
+  int stepsToRotate = target_degree - current_degree;
+  
+  int step_size = 1;
+  if(stepsToRotate < 0) step_size = -1;
+  stepsToRotate = abs(stepsToRotate);
+  for(int i=0; i<stepsToRotate; i++) {
+    baseStepper.step(step_size);
+    delay(30);
+  }
 
-    // step one revolution in the other direction:
-    Serial.println("counterclockwise");
-    baseStepper.step(-stepsPerRevolution);
-    digitalWrite(8, LOW);
-    digitalWrite(9, LOW);
-    digitalWrite(10, LOW);
-    digitalWrite(11, LOW);
-    delay(5000);
+  current_degree = target_degree;
+    
 }
 
 int read_proximity_sensor() {
@@ -206,8 +208,24 @@ boolean is_card_facing_up() {
     digitalWrite(s3,HIGH);
     int green_value = read_color_sensor();
     delay(20);
-
-    return blue_value > 22 and green_value > 40 and red_value > 50;
+    Serial.println("COLORS:");
+    Serial.print(" RED: ");
+    Serial.print(red_value);
+    Serial.println();
+    Serial.print(" BLUE: ");
+    Serial.print(blue_value);
+    Serial.println();
+    Serial.print(" GREEN: ");
+    Serial.print(green_value);
+    Serial.println();
+    if (blue_value <= 21 and green_value <= 21 and red_value <= 21){
+      if ((blue_value >= 16 and green_value >= 16 ) or (blue_value >= 16 and red_value >= 16) or (green_value >= 16 and red_value >= 16) ){
+        Serial.println("CARD FACING UP! ");
+       return true;
+      }
+    Serial.println("CARD FACING DOWN! ");
+    return false;
+    }
 }
 
 void detect_players() {
@@ -226,15 +244,23 @@ void detect_players() {
 }
 
 void deal_regular(int target_angle) {
-    spin_cards_wheel(2000);
-    delay(200);
+    rotate_platform(target_angle);
+    delay(500);
+    set_card_flipper_regular();
+    delay(500);
+    card_pusher_servo.write(70);
+    delay(500);
+    card_pusher_servo.write(90);
+    delay(500);
+    spin_cards_wheel(500);
+    delay(500);
 }
 
 void deal_flipped(int target_angle) {
 
     rotate_platform(360 - target_angle);
 
-    set_card_flipper_insert();
+    // set_card_flipper_insert();
     delay(1000);
     spin_cards_wheel(2000);
     delay(500);
@@ -302,57 +328,118 @@ void sync_game_state() {
  * Setup
  *********************************/
 void setup() {
-    Serial.begin(9600);
-    Wire.begin();
-    Wire.setClock(400000); // use 400 kHz I2C
-    setup_stepper_motors();
-    setup_servos();
-//    setup_dc_motors();
+  Serial.begin(9600);
+  Wire.begin();
+  Wire.setClock(400000); // use 400 kHz I2C
+  setup_servos();
+  setup_dc_motors();
 //    setup_proximity_sensor();
-//    setup_color_sensor();
+  setup_color_sensor();
 }
 
 /*********************************
  * Loop
  *********************************/
 void loop() {
-    //rotate_platform(1);
-    //rotate_card_flipper(45);
+    //deal_card(false, 10);
 
-    if(ArduinoUnoSerial.available() <= 0) return;
+    //is_card_facing_up();
+    spin_cards_wheel(500);
+    delay(5000);
+    //rotate_platform(30);
+
+    // delay(100);
+
+    // set_card_flipper_flipped();
+
+    // delay(5000);
+
+    // set_card_flipper_regular();
+
+    // delay(5000);
+    
+
+    // card_pusher_servo.write(70);
+
+    // delay(5000);
+
+    // card_pusher_servo.write(90);
+
+    // if(ArduinoUnoSerial.available() <= 0) return;
 
 
-    int command_packet = ArduinoUnoSerial.parseInt();
-    if(ArduinoUnoSerial.read() == '\n') {
-        ArduinoUnoSerial.flush();
-        Serial.println("Got command!");
-        int command = command_packet / 100;
-        int arg1 = command_packet /10 % 10;
-        int arg2 = command_packet % 10;
+    // int command_packet = ArduinoUnoSerial.parseInt();
+    // if(ArduinoUnoSerial.read() == '\n') {
+    //     ArduinoUnoSerial.flush();
+    //     Serial.println("Got command!");
+    //     int command = command_packet / 100;
+    //     int arg1 = command_packet /10 % 10;
+    //     int arg2 = command_packet % 10;
 
 
-        switch (command) {
-            case START_GAME:
-                start_game();
-                break;
-            case SCAN_PLAYERS:
-                detect_players();
-                break;
-            case START_ROUND:
-                start_round();
-                break;
-            case SHOW_CARD:
-                show_card();
-                break;
-            case PLAYER_QUIT:
-                int player_idx = arg1;
-                player_quit(player_idx);
-                break;
-            case RESET:
-                reset();
-                break;
-        }
-    }
+    //     switch (command) {
+    //         case START_GAME:
+    //             start_game();
+    //             break;
+    //         case SCAN_PLAYERS:
+    //             detect_players();
+    //             break;
+    //         case START_ROUND:
+    //             start_round();
+    //             break;
+    //         case SHOW_CARD:
+    //             show_card();
+    //             break;
+    //         case PLAYER_QUIT:
+    //             int player_idx = arg1;
+    //             player_quit(player_idx);
+    //             break;
+    //         case RESET:
+    //             reset();
+    //             break;
+    //     }
+    // }
 
-    sync_game_state();
+    // sync_game_state();
 }
+
+// #include "Arduino.h"
+// #include <Stepper.h>
+
+// const int stepsPerRevolution = 200;  // change this to fit the number of steps per revolution
+// // for your motor
+
+// // initialize the stepper library on pins 8 through 11:
+// Stepper myStepper(stepsPerRevolution, 8,9,10,11);
+
+// int stepCount = 0;         // number of steps the motor has taken
+
+// void setup() {
+//   // initialize the serial port:
+//   Serial.begin(9600);
+// }
+
+// void loop() {
+//   // step one step:
+//     for(int i=0; i<200; i++) {
+//         myStepper.step(1);
+//         Serial.print("steps:");
+//         Serial.println(stepCount);
+//         stepCount++;
+//         delay(30);
+//     }
+
+//     delay(5000);
+
+//     for(int i=200; i>0; i--) {
+//         myStepper.step(-1);
+//         Serial.print("steps:");
+//         Serial.println(stepCount);
+//         stepCount++;
+//         delay(30);
+//     }
+
+//     delay(5000);
+
+// }
+
