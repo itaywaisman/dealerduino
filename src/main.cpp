@@ -293,7 +293,6 @@ void reset() {
 
 void sync_game_state() {
     Serial.print(game_state);
-    Serial.print(';');
     Serial.print(player_num);
     Serial.println();
 }
@@ -320,25 +319,17 @@ void loop() {
     //rotate_platform(1);
     //rotate_card_flipper(45);
 
-    if (ArduinoUnoSerial.available() > 0 ) 
-    {
-        serialResponse = ArduinoUnoSerial.readStringUntil('\r\n');
+    if(ArduinoUnoSerial.available() <= 0) return;
 
-        char buf[sizeof(sample_packet)];
-        serialResponse.toCharArray(buf, sizeof(buf));
 
-        char *p = buf;
-        char *str;
-        int parts [5];
-        int current_part = 0;
-        while ((str = strtok_r(p, ";", &p)) != NULL) { // delimiter is the semicolon
-            parts[current_part] = String(str).toInt();
-            current_part++;
-        }
+    int command_packet = ArduinoUnoSerial.parseInt();
+    if(ArduinoUnoSerial.read() == '\n') {
+        ArduinoUnoSerial.flush();
+        Serial.println("Got command!");
+        int command = command_packet / 100;
+        int arg1 = command_packet /10 % 10;
+        int arg2 = command_packet % 10;
 
-        int command = parts[0];
-        int arg1 = parts[1];
-        int arg2 = parts[2];
 
         switch (command) {
             case START_GAME:
@@ -361,10 +352,7 @@ void loop() {
                 reset();
                 break;
         }
-
-        sync_game_state();
-
-
     }
 
+    sync_game_state();
 }
