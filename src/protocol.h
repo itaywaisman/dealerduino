@@ -39,13 +39,16 @@ bool send_packet(int packet) {
 
 int read_packet() {
     int packet = -1;
-    while(ArduinoUnoSerial->available() > 0) {
-        int packet_data = ArduinoUnoSerial->parseInt();
-        if(ArduinoUnoSerial->read() == '\n') {
-            packet = packet_data;
+    while(packet == -1) {
+        while(ArduinoUnoSerial->available() > 0) {
+            int packet_data = ArduinoUnoSerial->parseInt();
+            if(ArduinoUnoSerial->read() == '\n') {
+                packet = packet_data;
 
-            Serial.println('A');
+                Serial.println('A');
+            }
         }
+        delay(30);
     }
 
     return packet;
