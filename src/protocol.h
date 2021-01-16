@@ -3,9 +3,9 @@
 
 
 
-#include <SoftwareSerial.h>
-#include <Arduino.h>
 
+#include "Arduino.h"
+#include <SoftwareSerial.h>
 
 SoftwareSerial* ArduinoUnoSerial;
 
@@ -18,7 +18,7 @@ void setup_serial(int rx, int tx) {
 
 bool send_packet(int packet) {
     bool ack = false;
-    int retries = 3;
+    int retries = 10;
     while(!ack && retries > 0) {
         ArduinoUnoSerial->print(packet);
         ArduinoUnoSerial->println();
@@ -31,6 +31,7 @@ bool send_packet(int packet) {
                }
             }
         }
+        delay(30);
     }
 
     return ack;
