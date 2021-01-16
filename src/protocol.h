@@ -24,9 +24,9 @@ bool send_packet(int packet) {
         ArduinoUnoSerial->println();
         retries = retries - 1;
         while(ArduinoUnoSerial->available() > 0) {
-            char ack_packet = ArduinoUnoSerial->read();
+            String ack_packet = ArduinoUnoSerial->readStringUntil('\n');
             if(ArduinoUnoSerial->read() == '\n') {
-               if(ack_packet == 'A')  {
+               if(ack_packet == "ACK")  {
                    ack = true;
                }
             }
@@ -45,7 +45,7 @@ int read_packet() {
             if(ArduinoUnoSerial->read() == '\n') {
                 packet = packet_data;
 
-                Serial.println('A');
+                Serial.println("ACK");
             }
         }
         delay(30);
