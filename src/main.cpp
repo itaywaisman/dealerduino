@@ -8,7 +8,7 @@
 #include <Wire.h>
 #include "VL53L1X.h"
 #include <SoftwareSerial.h>
-
+#include "./protocol.h"
 
 // "http://librarymanager/All#SparkFun_VL53L1X
 
@@ -20,35 +20,26 @@
 #define out 6
 //END COLOR SENSOR !
 
-//
-#define enA 12
-#define in1 1
-#define in2 2
-#define in3 3
-#define in4 4
-#define in5 5
-#define in6 6
-#define in7 7
-#define in7 8
-#define in7 9
-#define in7 10
-#define in7 11
-#define in12 12
-#define in13 13
 
+
+#define CARD_ACCELERATOR_1 8
+#define CARD_ACCELERATOR_2 9
+#define PLATFORM_ROTATION_OUT 4
 #define CARD_FLIPPING_OUT 7
 #define PLATFORM_OUT_1 8
 #define PLATFORM_OUT_2 9
 #define PLATFORM_OUT_3 10
 #define PLATFORM_OUT_4 11
 #define CARD_PUSHER_OUT 12
-#define PLATFORM_ROTATION_OUT 4
+
 
 #define CARD_FLIPPER_REGULAR 0
 #define CARD_FLIPPER_INSERT 180
 
 #define PROXIMITY_DISTANCE 1000
 #define PROXIMITY_DELTA 200
+
+void set_card_flipper_regular();
 
 enum DEALER_COMMANDS {
     DO_NOTHING = 0,
@@ -63,22 +54,24 @@ enum DEALER_COMMANDS {
 enum GAME_STATE {
     NOT_STARTED = 0,
     STARTED = 1,
-    ROUND_STARTED = 2,
-    DEALT_CARD_1 = 12,
-    DEALT_CARD_2 = 13,
-    DEALT_CARD_3 = 14,
-    DEALT_CARD_4 = 15,
-    ROUND_FINISHED = 16,
+    SCANNING_PLAYERS = 2,
+    SCANNED_PLAYERS = 3,
+    ROUND_STARTED = 4,
+    DEALT_CARD_1 = 5,
+    DEALT_CARD_2 = 6,
+    DEALT_CARD_3 = 7,
+    DEALT_CARD_4 = 8,
+    ROUND_FINISHED = 9,
     ERROR = 100
 };
 
-SoftwareSerial ArduinoUnoSerial(0,1);
+
 String serialResponse; // complete message from arduino, which consists of snesors data
 char sample_packet[] = "0;0;0";
 
 /// GAME STATE
 int game_state = NOT_STARTED;
-int player_angles[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
+int player_angles[4] = {-1, -1, -1, -1};
 int player_num = 0;
 
 VL53L1X distance_sensor;
@@ -94,12 +87,19 @@ Stepper baseStepper(stepsPerRevolution, PLATFORM_OUT_1, PLATFORM_OUT_2, PLATFORM
 int current_degree = 0;
 
 
+
+
+
 void setup_dc_motors() {
-    pinMode(enA, OUTPUT);
-    pinMode(0, OUTPUT);
-    pinMode(1, OUTPUT);
-    pinMode(in3, OUTPUT);
-    pinMode(in4, OUTPUT);
+    // pinMode(enA, OUTPUT);
+    pinMode(CARD_ACCELERATOR_1, OUTPUT);
+    pinMode(CARD_ACCELERATOR_2, OUTPUT);
+    // pinMode(in3, OUTPUT);
+    // pinMode(in4, OUTPUT);
+}
+
+void setup_stepper() {
+      baseStepper.setSpeed(30);
 }
 
 void setup_proximity_sensor() {
@@ -125,6 +125,25 @@ void setup_servos() {
 }
 
 
+
+
+/*********************************
+ * State methods
+ *********************************/
+
+void sync_game_state() {
+    delay(100);
+    Serial.println("sending state...");
+
+    int packet = game_state * 10 + player_num;
+
+    if(!send_packet(packet)) {
+        Serial.println("Couldn't send packet to wifi over serial!");
+    }
+}
+
+
+
 /*********************************
  * Hardware methods
  *********************************/
@@ -133,12 +152,12 @@ void setup_servos() {
 void spin_cards_wheel(int ms=1000) {
   //not working yet !!!
     Serial.print("SPIN MOTOR!");
-    digitalWrite(0, HIGH);
-    digitalWrite(1, LOW);
+    digitalWrite(CARD_ACCELERATOR_1, HIGH);
+    digitalWrite(CARD_ACCELERATOR_2, LOW);
     delay(ms);
 
-    digitalWrite(0, LOW);
-    digitalWrite(1, LOW);
+    digitalWrite(CARD_ACCELERATOR_1, LOW);
+    digitalWrite(CARD_ACCELERATOR_2, LOW);
     delay(ms);
 }
 
@@ -152,7 +171,7 @@ void set_card_flipper_flipped() {
 
 void rotate_platform(int target_degree) {
   int stepsToRotate = target_degree - current_degree;
-  
+  Serial.print(stepsToRotate);
   int step_size = 1;
   if(stepsToRotate < 0) step_size = -1;
   stepsToRotate = abs(stepsToRotate);
@@ -161,6 +180,10 @@ void rotate_platform(int target_degree) {
     delay(30);
   }
 
+digitalWrite(PLATFORM_OUT_1, LOW);
+digitalWrite(PLATFORM_OUT_2, LOW);
+digitalWrite(PLATFORM_OUT_3, LOW);
+digitalWrite(PLATFORM_OUT_4, LOW);
   current_degree = target_degree;
     
 }
@@ -229,6 +252,8 @@ boolean is_card_facing_up() {
 }
 
 void detect_players() {
+    game_state = SCANNING_PLAYERS;
+    sync_game_state();
     int player_idx = 0;
     for (int pos = 180; pos >= 0; pos -= 1) { // goes from 180 degrees to 0 degrees
         rotate_platform(pos);
@@ -241,6 +266,8 @@ void detect_players() {
     player_num = player_idx;
 
     rotate_platform(90);
+    game_state = SCANNED_PLAYERS;
+    Serial.println("Scanned All players");
 }
 
 void deal_regular(int target_angle) {
@@ -317,43 +344,67 @@ void reset() {
     }
 }
 
-void sync_game_state() {
-    Serial.print(game_state);
-    Serial.print(player_num);
-    Serial.println();
-}
 
 
 /*********************************
  * Setup
  *********************************/
 void setup() {
-  Serial.begin(9600);
-  Wire.begin();
-  Wire.setClock(400000); // use 400 kHz I2C
-  setup_servos();
-  setup_dc_motors();
-//    setup_proximity_sensor();
-  setup_color_sensor();
+    Serial.begin(9600);
+    
+    Wire.begin();
+    Wire.setClock(400000); // use 400 kHz I2C
+
+    setup_serial(3, 2);
+
+    // setup_servos();
+    // setup_dc_motors();
+    // setup_stepper();
+    // // setup_proximity_sensor();
+    // // setup_color_sensor();
+    sync_game_state();
+
 }
 
 /*********************************
  * Loop
  *********************************/
 void loop() {
+
+    // spin_cards_wheel(1000);
+
+    // delay(2000);
+
     //deal_card(false, 10);
 
     //is_card_facing_up();
-    spin_cards_wheel(500);
-    delay(5000);
-    //rotate_platform(30);
-
-    // delay(100);
+    // spin_cards_wheel(500);
+    // delay(5000);
 
     // set_card_flipper_flipped();
 
     // delay(5000);
+    
+//    for(int i=0; i<200; i++) {
+//         baseStepper.step(1);
+//         delay(30);
+//     }
+//     digitalWrite(PLATFORM_OUT_1, LOW);
+//     digitalWrite(PLATFORM_OUT_2, LOW);
+//     digitalWrite(PLATFORM_OUT_3, LOW);
+//     digitalWrite(PLATFORM_OUT_4, LOW);
+//     delay(5000);
 
+//     for(int i=200; i>0; i--) {
+//         baseStepper.step(-1);
+//         delay(30);
+//     }
+//     digitalWrite(PLATFORM_OUT_1, LOW);
+//     digitalWrite(PLATFORM_OUT_2, LOW);
+//     digitalWrite(PLATFORM_OUT_3, LOW);
+//     digitalWrite(PLATFORM_OUT_4, LOW);
+//     delay(5000);
+    
     // set_card_flipper_regular();
 
     // delay(5000);
@@ -365,81 +416,51 @@ void loop() {
 
     // card_pusher_servo.write(90);
 
-    // if(ArduinoUnoSerial.available() <= 0) return;
+    // delay(5000);
 
+    // set_card_flipper_flipped();
 
-    // int command_packet = ArduinoUnoSerial.parseInt();
-    // if(ArduinoUnoSerial.read() == '\n') {
-    //     ArduinoUnoSerial.flush();
-    //     Serial.println("Got command!");
-    //     int command = command_packet / 100;
-    //     int arg1 = command_packet /10 % 10;
-    //     int arg2 = command_packet % 10;
+    // delay(5000);
+    int command_packet = read_packet();
+    if(command_packet != -1) {
+        Serial.println("Got command!");
+    
+        int command = command_packet / 100;
+        int arg1 = command_packet /10 % 10;
+        int arg2 = command_packet % 10;
 
+        Serial.println(command);
+        Serial.println(arg1);
+        Serial.println(arg2);
 
-    //     switch (command) {
-    //         case START_GAME:
-    //             start_game();
-    //             break;
-    //         case SCAN_PLAYERS:
-    //             detect_players();
-    //             break;
-    //         case START_ROUND:
-    //             start_round();
-    //             break;
-    //         case SHOW_CARD:
-    //             show_card();
-    //             break;
-    //         case PLAYER_QUIT:
-    //             int player_idx = arg1;
-    //             player_quit(player_idx);
-    //             break;
-    //         case RESET:
-    //             reset();
-    //             break;
-    //     }
-    // }
+        switch (command) {
+            case START_GAME:
+                start_game();
+                break;
+            case SCAN_PLAYERS:
+                detect_players();
+                break;
+            case START_ROUND:
+                start_round();
+                break;
+            case SHOW_CARD:
+                show_card();
+                break;
+            case PLAYER_QUIT:
+                int player_idx = arg1;
+                player_quit(player_idx);
+                break;
+            case RESET:
+                reset();
+                break;
+        }
 
-    // sync_game_state();
+        
+    } 
+    
+    sync_game_state();
+        
+
+    delay(100);
 }
-
-// #include "Arduino.h"
-// #include <Stepper.h>
-
-// const int stepsPerRevolution = 200;  // change this to fit the number of steps per revolution
-// // for your motor
-
-// // initialize the stepper library on pins 8 through 11:
-// Stepper myStepper(stepsPerRevolution, 8,9,10,11);
-
-// int stepCount = 0;         // number of steps the motor has taken
-
-// void setup() {
-//   // initialize the serial port:
-//   Serial.begin(9600);
-// }
-
-// void loop() {
-//   // step one step:
-//     for(int i=0; i<200; i++) {
-//         myStepper.step(1);
-//         Serial.print("steps:");
-//         Serial.println(stepCount);
-//         stepCount++;
-//         delay(30);
-//     }
-
-//     delay(5000);
-
-//     for(int i=200; i>0; i--) {
-//         myStepper.step(-1);
-//         Serial.print("steps:");
-//         Serial.println(stepCount);
-//         stepCount++;
-//         delay(30);
-//     }
-
-//     delay(5000);
-
-// }
 
