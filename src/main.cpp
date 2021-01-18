@@ -1,7 +1,3 @@
-//
-// Created by LIORD on 20/11/2020.
-//
-
 #include "Arduino.h"
 #include <Servo.h>
 #include <Stepper.h>
@@ -12,6 +8,13 @@
 
 // "http://librarymanager/All#SparkFun_VL53L1X
 
+
+//----------------------SIGNALS START---------------------------
+
+
+#define CARD_ACCELERATOR_1 0
+#define CARD_ACCELERATOR_2 1
+
 //START COLOR SENSOR :
 #define s0 2       //Module pins wiring
 #define s1 3
@@ -21,16 +24,16 @@
 //END COLOR SENSOR !
 
 
-
-#define CARD_ACCELERATOR_1 8
-#define CARD_ACCELERATOR_2 9
-#define PLATFORM_ROTATION_OUT 4
-#define CARD_FLIPPING_OUT 7
 #define PLATFORM_OUT_1 8
 #define PLATFORM_OUT_2 9
 #define PLATFORM_OUT_3 10
 #define PLATFORM_OUT_4 11
+
 #define CARD_PUSHER_OUT 12
+#define CARD_FLIPPING_OUT 13
+
+
+//----------------------SIGNALS END---------------------------
 
 
 #define CARD_FLIPPER_REGULAR 0
@@ -38,8 +41,6 @@
 
 #define PROXIMITY_DISTANCE 1000
 #define PROXIMITY_DELTA 200
-
-void set_card_flipper_regular();
 
 enum DEALER_COMMANDS {
     DO_NOTHING = 0,
@@ -148,17 +149,22 @@ void sync_game_state() {
  * Hardware methods
  *********************************/
 
+void spin_cards_first(int time=500) {
+  card_pusher_servo.write(70);
+  delay(time);
+  card_pusher_servo.write(90);
+}
 
-void spin_cards_wheel(int ms=1000) {
+void spin_cards_exit(int time=500) {
   //not working yet !!!
     Serial.print("SPIN MOTOR!");
     digitalWrite(CARD_ACCELERATOR_1, HIGH);
     digitalWrite(CARD_ACCELERATOR_2, LOW);
-    delay(ms);
+    delay(time);
 
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, LOW);
-    delay(ms);
+    delay(time);
 }
 
 void set_card_flipper_regular() {
@@ -175,7 +181,8 @@ void rotate_platform(int target_degree) {
   int step_size = 1;
   if(stepsToRotate < 0) step_size = -1;
   stepsToRotate = abs(stepsToRotate);
-  for(int i=0; i<stepsToRotate; i++) {
+  int steps_after_scale = round(stepsToRotate/2); //degree scale
+  for(int i=0; i<steps_after_scale; i++) {
     baseStepper.step(step_size);
     delay(30);
   }
@@ -275,11 +282,9 @@ void deal_regular(int target_angle) {
     delay(500);
     set_card_flipper_regular();
     delay(500);
-    card_pusher_servo.write(70);
+    spin_cards_first(500);
     delay(500);
-    card_pusher_servo.write(90);
-    delay(500);
-    spin_cards_wheel(500);
+    spin_cards_exit(500);
     delay(500);
 }
 
@@ -289,7 +294,7 @@ void deal_flipped(int target_angle) {
 
     // set_card_flipper_insert();
     delay(1000);
-    spin_cards_wheel(2000);
+    spin_cards_exit(2000);
     delay(500);
     //set_card_flipper_flip();
     delay(500);
