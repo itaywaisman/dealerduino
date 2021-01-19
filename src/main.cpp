@@ -89,8 +89,6 @@ int current_degree = 0;
 
 
 
-
-
 void setup_dc_motors() {
     // pinMode(enA, OUTPUT);
     pinMode(CARD_ACCELERATOR_1, OUTPUT);
@@ -155,16 +153,19 @@ void spin_cards_first(int time=500) {
   card_pusher_servo.write(90);
 }
 
-void spin_cards_exit(int time=500) {
-  //not working yet !!!
+void spin_cards_exit(int time=400) {
     Serial.print("SPIN MOTOR!");
     digitalWrite(CARD_ACCELERATOR_1, HIGH);
     digitalWrite(CARD_ACCELERATOR_2, LOW);
     delay(time);
-
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, LOW);
-    delay(time);
+}
+
+void push_card_out(){
+    spin_cards_first();
+    delay(100);
+    spin_cards_exit();
 }
 
 void set_card_flipper_regular() {
@@ -176,22 +177,21 @@ void set_card_flipper_flipped() {
 }
 
 void rotate_platform(int target_degree) {
-  int stepsToRotate = target_degree - current_degree;
-  Serial.print(stepsToRotate);
-  int step_size = 1;
-  if(stepsToRotate < 0) step_size = -1;
-  stepsToRotate = abs(stepsToRotate);
-  int steps_after_scale = round(stepsToRotate/2); //degree scale
-  for(int i=0; i<steps_after_scale; i++) {
-    baseStepper.step(step_size);
-    delay(30);
-  }
-
-digitalWrite(PLATFORM_OUT_1, LOW);
-digitalWrite(PLATFORM_OUT_2, LOW);
-digitalWrite(PLATFORM_OUT_3, LOW);
-digitalWrite(PLATFORM_OUT_4, LOW);
-  current_degree = target_degree;
+    int stepsToRotate = target_degree - current_degree;
+    Serial.print(stepsToRotate);
+    int step_size = 1;
+    if(stepsToRotate < 0) step_size = -1;
+    stepsToRotate = abs(stepsToRotate);
+    int steps_after_scale = round(stepsToRotate/2); //degree scale
+    for(int i=0; i<steps_after_scale; i++) {
+        baseStepper.step(step_size);
+        delay(30);
+    }
+    digitalWrite(PLATFORM_OUT_1, LOW);
+    digitalWrite(PLATFORM_OUT_2, LOW);
+    digitalWrite(PLATFORM_OUT_3, LOW);
+    digitalWrite(PLATFORM_OUT_4, LOW);
+    current_degree = target_degree;
     
 }
 
@@ -208,14 +208,6 @@ int read_color_sensor(){
     return data;
 }
 
-
-/*********************************
- * Game logic methods
- *********************************/
-
-void start_game() {
-    game_state = STARTED;
-}
 
 boolean is_player_detected() {
     return abs(read_proximity_sensor() - PROXIMITY_DISTANCE) < PROXIMITY_DELTA;
@@ -258,48 +250,28 @@ boolean is_card_facing_up() {
     }
 }
 
-void detect_players() {
-    game_state = SCANNING_PLAYERS;
-    sync_game_state();
-    int player_idx = 0;
-    for (int pos = 180; pos >= 0; pos -= 1) { // goes from 180 degrees to 0 degrees
-        rotate_platform(pos);
-        if(is_player_detected()) {
-            player_angles[player_idx] = pos;
-            player_idx++;
-        }
-    }
-
-    player_num = player_idx;
-
-    rotate_platform(90);
-    game_state = SCANNED_PLAYERS;
-    Serial.println("Scanned All players");
-}
-
 void deal_regular(int target_angle) {
+
     rotate_platform(target_angle);
-    delay(500);
+    delay(200);
+
     set_card_flipper_regular();
-    delay(500);
-    spin_cards_first(500);
-    delay(500);
-    spin_cards_exit(500);
-    delay(500);
+    delay(200);
+    
+    push_card_out();
+    delay(200);
 }
 
 void deal_flipped(int target_angle) {
 
-    rotate_platform(360 - target_angle);
+    rotate_platform(180 - target_angle);
+    delay(200);
 
-    // set_card_flipper_insert();
-    delay(1000);
-    spin_cards_exit(2000);
-    delay(500);
-    //set_card_flipper_flip();
-    delay(500);
-    set_card_flipper_regular();
-    delay(500);
+    set_card_flipper_flipped();
+    delay(200);
+
+    push_card_out();
+    delay(200);
 }
 
 void deal_card(boolean is_open, int target_angle) {
@@ -320,35 +292,70 @@ void deal_card(boolean is_open, int target_angle) {
     }
 }
 
-void show_card() {
-    deal_card(true, 90);
-    game_state = game_state + 1;
 
+/*********************************
+ * Game Functions
+ *********************************/
+void start_game() {
+    game_state = STARTED;
+    sync_game_state();
+    rotate_platform(180);
+    set_card_flipper_regular();
+}
+
+void detect_players() {
+    game_state = SCANNING_PLAYERS;
+    sync_game_state();
+
+    for (int pos = 180; pos >= 0; pos -= 20) { // goes from 180 degrees to 0 degrees
+        rotate_platform(pos);
+        if(is_player_detected()) {
+            player_angles[player_num] = pos;
+            player_num++;
+        }
+        if (player_num == 4){
+            break;
+        }
+        delay(30);
+    }
+
+    rotate_platform(90);
+    game_state = SCANNED_PLAYERS;
+    sync_game_state();
+    Serial.println("Scanned All players");
 }
 
 void start_round() {
-    for(int i = 0; i < 8; i++) {
+    for(int i = 0; i < 4; i++) {
         if(player_angles[i] >= 0) {
-
             deal_card(false, player_angles[i]);
             deal_card(false, player_angles[i]);
-
         }
     }
+    rotate_platform(90);
     game_state = ROUND_STARTED;
+    sync_game_state();
+}
+
+void show_card() {
+    deal_card(true, 90);
+    game_state = game_state + 1;
+    sync_game_state();
 }
 
 void player_quit(int player_idx) {
     player_angles[player_idx] = -1;
+    player_num--;
 }
 
 void reset() {
     game_state = NOT_STARTED;
-    for(int i = 0; i < 8; i++) {
+    for(int i = 0; i < 4; i++) {
         player_angles[i] = -1;
     }
+    player_num = 0;
+    sync_game_state();
 }
-
 
 
 /*********************************
@@ -360,14 +367,14 @@ void setup() {
     Wire.begin();
     Wire.setClock(400000); // use 400 kHz I2C
 
-    setup_serial(3, 2);
+    //setup_serial(3, 2); //WIFI
 
-    // setup_servos();
-    // setup_dc_motors();
+    setup_servos();
+    setup_dc_motors();
     // setup_stepper();
-    // // setup_proximity_sensor();
-    // // setup_color_sensor();
-    sync_game_state();
+    // setup_proximity_sensor();
+    // setup_color_sensor();
+    //sync_game_state();
 
 }
 
@@ -376,56 +383,19 @@ void setup() {
  *********************************/
 void loop() {
 
-    // spin_cards_wheel(1000);
-
-    // delay(2000);
-
-    //deal_card(false, 10);
-
-    //is_card_facing_up();
-    // spin_cards_wheel(500);
-    // delay(5000);
+    push_card_out();
+    delay (2000);
 
     // set_card_flipper_flipped();
 
     // delay(5000);
-    
-//    for(int i=0; i<200; i++) {
-//         baseStepper.step(1);
-//         delay(30);
-//     }
-//     digitalWrite(PLATFORM_OUT_1, LOW);
-//     digitalWrite(PLATFORM_OUT_2, LOW);
-//     digitalWrite(PLATFORM_OUT_3, LOW);
-//     digitalWrite(PLATFORM_OUT_4, LOW);
-//     delay(5000);
-
-//     for(int i=200; i>0; i--) {
-//         baseStepper.step(-1);
-//         delay(30);
-//     }
-//     digitalWrite(PLATFORM_OUT_1, LOW);
-//     digitalWrite(PLATFORM_OUT_2, LOW);
-//     digitalWrite(PLATFORM_OUT_3, LOW);
-//     digitalWrite(PLATFORM_OUT_4, LOW);
-//     delay(5000);
     
     // set_card_flipper_regular();
 
     // delay(5000);
     
 
-    // card_pusher_servo.write(70);
-
-    // delay(5000);
-
-    // card_pusher_servo.write(90);
-
-    // delay(5000);
-
-    // set_card_flipper_flipped();
-
-    // delay(5000);
+    /*
     int command_packet = read_packet();
     if(command_packet != -1) {
         Serial.println("Got command!");
@@ -467,5 +437,7 @@ void loop() {
         
 
     delay(100);
+    */
+
 }
 
