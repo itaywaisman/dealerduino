@@ -12,8 +12,8 @@
 //----------------------SIGNALS START---------------------------
 
 
-#define CARD_ACCELERATOR_1 0
-#define CARD_ACCELERATOR_2 1
+#define CARD_ACCELERATOR_1 8
+#define CARD_ACCELERATOR_2 9
 
 //START COLOR SENSOR :
 #define s0 2       //Module pins wiring
@@ -23,11 +23,8 @@
 #define out 6
 //END COLOR SENSOR !
 
-
-#define PLATFORM_OUT_1 8
-#define PLATFORM_OUT_2 9
-#define PLATFORM_OUT_3 10
-#define PLATFORM_OUT_4 11
+#define STEPPER_STEP 10
+#define STEPPER_DIRECTION 11
 
 #define CARD_PUSHER_OUT 12
 #define CARD_FLIPPING_OUT 13
@@ -38,9 +35,6 @@
 
 #define CARD_FLIPPER_REGULAR 0
 #define CARD_FLIPPER_INSERT 180
-
-#define PROXIMITY_DISTANCE 1000
-#define PROXIMITY_DELTA 200
 
 enum DEALER_COMMANDS {
     DO_NOTHING = 0,
@@ -80,11 +74,7 @@ VL53L1X distance_sensor;
 Servo card_flipping_servo;
 Servo card_pusher_servo;
 
-// Number of steps per output rotation
-const int stepsPerRevolution = 200;
 
-// Create Instance of Stepper library
-Stepper baseStepper(stepsPerRevolution, PLATFORM_OUT_1, PLATFORM_OUT_2, PLATFORM_OUT_3, PLATFORM_OUT_4);
 int current_degree = 0;
 
 
@@ -98,10 +88,11 @@ void setup_dc_motors() {
 }
 
 void setup_stepper() {
-      baseStepper.setSpeed(30);
+    pinMode(STEPPER_DIRECTION,OUTPUT); 
+    pinMode(STEPPER_STEP,OUTPUT);
 }
 
-void setup_proximity_sensor() {
+void setup_proximity_sensor_and_color_sensor() { //there is no setup for color
 
     if (!distance_sensor.init())
     {
@@ -112,10 +103,6 @@ void setup_proximity_sensor() {
     distance_sensor.setDistanceMode(VL53L1X::Long);
     distance_sensor.setMeasurementTimingBudget(50000);
     distance_sensor.startContinuous(50);
-}
-
-void setup_color_sensor() {
-
 }
 
 void setup_servos() {
@@ -147,24 +134,20 @@ void sync_game_state() {
  * Hardware methods
  *********************************/
 
-void spin_cards_first(int time=500) {
-  card_pusher_servo.write(70);
-  delay(time);
-  card_pusher_servo.write(90);
-}
-
-void spin_cards_exit(int time=400) {
+void spin_cards_exit() {
+    card_pusher_servo.write(70);
+    delay(500);
     Serial.print("SPIN MOTOR!");
-    digitalWrite(CARD_ACCELERATOR_1, HIGH);
-    digitalWrite(CARD_ACCELERATOR_2, LOW);
-    delay(time);
+    digitalWrite(CARD_ACCELERATOR_1, LOW);
+    digitalWrite(CARD_ACCELERATOR_2, HIGH);
+    delay(200);
+    card_pusher_servo.write(90);
+    delay(500);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, LOW);
 }
 
 void push_card_out(){
-    spin_cards_first();
-    delay(100);
     spin_cards_exit();
 }
 
@@ -177,28 +160,39 @@ void set_card_flipper_flipped() {
 }
 
 void rotate_platform(int target_degree) {
-    int stepsToRotate = target_degree - current_degree;
-    Serial.print(stepsToRotate);
-    int step_size = 1;
-    if(stepsToRotate < 0) step_size = -1;
-    stepsToRotate = abs(stepsToRotate);
-    int steps_after_scale = round(stepsToRotate/2); //degree scale
-    for(int i=0; i<steps_after_scale; i++) {
-        baseStepper.step(step_size);
-        delay(30);
-    }
-    digitalWrite(PLATFORM_OUT_1, LOW);
-    digitalWrite(PLATFORM_OUT_2, LOW);
-    digitalWrite(PLATFORM_OUT_3, LOW);
-    digitalWrite(PLATFORM_OUT_4, LOW);
-    current_degree = target_degree;
-    
+   float scale = 100/180;
+   if (scale*target_degree == floor(scale*target_degree)){
+       target_degree = scale*target_degree;
+   }
+   else {
+       target_degree = round(scale*target_degree);
+   }
+   int degree_to_move = abs(target_degree - current_degree);
+   if (target_degree - current_degree >= 0){
+        digitalWrite(STEPPER_DIRECTION,HIGH); // Enables the motor to move in a particular direction
+        // Makes 200 pulses for making one full cycle rotation
+        for(int x = 0; x < degree_to_move; x++) {
+            digitalWrite(STEPPER_STEP,HIGH); 
+            delay(60); 
+            digitalWrite(STEPPER_STEP,LOW); 
+        }
+   }
+   else{
+        digitalWrite(STEPPER_DIRECTION,LOW); //Changes the rotations direction
+        for(int x = 0; x < degree_to_move; x++) {
+            digitalWrite(STEPPER_STEP,HIGH);
+            delay(60);
+            digitalWrite(STEPPER_STEP,LOW);
+        }
+   }
 }
 
 int read_proximity_sensor() {
     distance_sensor.read();
 
     int range_in_mm = distance_sensor.ranging_data.range_mm;
+    Serial.print("The range in mm is: ");
+    Serial.println(range_in_mm);
     return range_in_mm;
 }
 
@@ -209,8 +203,12 @@ int read_color_sensor(){
 }
 
 
-boolean is_player_detected() {
-    return abs(read_proximity_sensor() - PROXIMITY_DISTANCE) < PROXIMITY_DELTA;
+int is_player_detected_and_range() {
+    int range_to_player = read_proximity_sensor();
+    if (range_to_player <= 1300){ // 1.3 meters from players
+        return range_to_player;
+    }
+    return -1;
 }
 
 boolean is_card_facing_up() {
@@ -248,6 +246,7 @@ boolean is_card_facing_up() {
     Serial.println("CARD FACING DOWN! ");
     return false;
     }
+    return false;
 }
 
 void deal_regular(int target_angle) {
@@ -307,16 +306,16 @@ void detect_players() {
     game_state = SCANNING_PLAYERS;
     sync_game_state();
 
-    for (int pos = 180; pos >= 0; pos -= 20) { // goes from 180 degrees to 0 degrees
+    for (int pos = 0; pos >= 180; pos += 20) { // goes from 180 degrees to 0 degrees
         rotate_platform(pos);
-        if(is_player_detected()) {
+        if(is_player_detected_and_range() != -1) {
             player_angles[player_num] = pos;
             player_num++;
         }
         if (player_num == 4){
             break;
         }
-        delay(30);
+        delay(200);
     }
 
     rotate_platform(90);
@@ -363,17 +362,13 @@ void reset() {
  *********************************/
 void setup() {
     Serial.begin(9600);
-    
     Wire.begin();
     Wire.setClock(400000); // use 400 kHz I2C
-
     //setup_serial(3, 2); //WIFI
-
     setup_servos();
     setup_dc_motors();
-    // setup_stepper();
-    // setup_proximity_sensor();
-    // setup_color_sensor();
+    setup_stepper();
+    setup_proximity_sensor_and_color_sensor();
     //sync_game_state();
 
 }
@@ -382,9 +377,8 @@ void setup() {
  * Loop
  *********************************/
 void loop() {
-
-    push_card_out();
-    delay (2000);
+    is_card_facing_up();
+    delay(2000);
 
     // set_card_flipper_flipped();
 
