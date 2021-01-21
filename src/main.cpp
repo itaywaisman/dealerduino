@@ -5,16 +5,12 @@
 #include "VL53L1X.h"
 #include <SoftwareSerial.h>
 #include "./protocol.h"
-
 // "http://librarymanager/All#SparkFun_VL53L1X
-
 
 //----------------------SIGNALS START---------------------------
 
-
 #define CARD_ACCELERATOR_1 8
 #define CARD_ACCELERATOR_2 9
-
 //START COLOR SENSOR :
 #define s0 2       //Module pins wiring
 #define s1 3
@@ -22,16 +18,12 @@
 #define s3 5
 #define out 6
 //END COLOR SENSOR !
-
+#define CARD_PLATFORM_FLIPPING_OUT 7
 #define STEPPER_STEP 10
 #define STEPPER_DIRECTION 11
-
 #define CARD_PUSHER_OUT 12
-#define CARD_FLIPPING_OUT 13
-
 
 //----------------------SIGNALS END---------------------------
-
 
 #define CARD_FLIPPER_REGULAR 0
 #define CARD_FLIPPER_INSERT 180
@@ -60,24 +52,18 @@ enum GAME_STATE {
     ERROR = 100
 };
 
-
 String serialResponse; // complete message from arduino, which consists of snesors data
+VL53L1X distance_sensor;
+Servo card_flipping_servo;
+Servo card_pusher_servo;
+
 char sample_packet[] = "0;0;0";
 
 /// GAME STATE
 int game_state = NOT_STARTED;
 int player_angles[4] = {-1, -1, -1, -1};
 int player_num = 0;
-
-VL53L1X distance_sensor;
-
-Servo card_flipping_servo;
-Servo card_pusher_servo;
-
-
 int current_degree = 0;
-
-
 
 void setup_dc_motors() {
     // pinMode(enA, OUTPUT);
@@ -106,12 +92,9 @@ void setup_proximity_sensor_and_color_sensor() { //there is no setup for color
 }
 
 void setup_servos() {
-    card_flipping_servo.attach(CARD_FLIPPING_OUT);
+    card_flipping_servo.attach(CARD_PLATFORM_FLIPPING_OUT);
     card_pusher_servo.attach(CARD_PUSHER_OUT);
 }
-
-
-
 
 /*********************************
  * State methods
@@ -128,16 +111,13 @@ void sync_game_state() {
     }
 }
 
-
-
 /*********************************
  * Hardware methods
  *********************************/
 
-void spin_cards_exit() {
-    card_pusher_servo.write(70);
-    delay(500);
-    Serial.print("SPIN MOTOR!");
+void push_card_out(){
+    card_pusher_servo.write(60);
+    delay(340);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, HIGH);
     delay(200);
@@ -145,10 +125,6 @@ void spin_cards_exit() {
     delay(500);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, LOW);
-}
-
-void push_card_out(){
-    spin_cards_exit();
 }
 
 void set_card_flipper_regular() {
@@ -160,18 +136,12 @@ void set_card_flipper_flipped() {
 }
 
 void rotate_platform(int target_degree) {
-   float scale = 100/180;
-   if (scale*target_degree == floor(scale*target_degree)){
-       target_degree = scale*target_degree;
-   }
-   else {
-       target_degree = round(scale*target_degree);
-   }
    int degree_to_move = abs(target_degree - current_degree);
+   int how_much_to_move = round(100*degree_to_move/180);
    if (target_degree - current_degree >= 0){
         digitalWrite(STEPPER_DIRECTION,HIGH); // Enables the motor to move in a particular direction
         // Makes 200 pulses for making one full cycle rotation
-        for(int x = 0; x < degree_to_move; x++) {
+        for(int x = 0; x < how_much_to_move; x++) {
             digitalWrite(STEPPER_STEP,HIGH); 
             delay(60); 
             digitalWrite(STEPPER_STEP,LOW); 
@@ -179,17 +149,17 @@ void rotate_platform(int target_degree) {
    }
    else{
         digitalWrite(STEPPER_DIRECTION,LOW); //Changes the rotations direction
-        for(int x = 0; x < degree_to_move; x++) {
+        for(int x = 0; x < how_much_to_move; x++) {
             digitalWrite(STEPPER_STEP,HIGH);
             delay(60);
             digitalWrite(STEPPER_STEP,LOW);
         }
    }
+   current_degree = target_degree;
 }
 
 int read_proximity_sensor() {
     distance_sensor.read();
-
     int range_in_mm = distance_sensor.ranging_data.range_mm;
     Serial.print("The range in mm is: ");
     Serial.println(range_in_mm);
@@ -202,10 +172,9 @@ int read_color_sensor(){
     return data;
 }
 
-
 int is_player_detected_and_range() {
     int range_to_player = read_proximity_sensor();
-    if (range_to_player <= 1300){ // 1.3 meters from players
+    if (range_to_player <= 1000){ // 1.0 meters from players
         return range_to_player;
     }
     return -1;
@@ -252,25 +221,25 @@ boolean is_card_facing_up() {
 void deal_regular(int target_angle) {
 
     rotate_platform(target_angle);
-    delay(200);
+    delay(400);
 
     set_card_flipper_regular();
-    delay(200);
+    delay(400);
     
     push_card_out();
-    delay(200);
+    delay(400);
 }
 
 void deal_flipped(int target_angle) {
 
-    rotate_platform(180 - target_angle);
-    delay(200);
+    rotate_platform((180 + target_angle) %360);
+    delay(400);
 
     set_card_flipper_flipped();
-    delay(200);
+    delay(400);
 
     push_card_out();
-    delay(200);
+    delay(400);
 }
 
 void deal_card(boolean is_open, int target_angle) {
@@ -291,49 +260,63 @@ void deal_card(boolean is_open, int target_angle) {
     }
 }
 
-
 /*********************************
  * Game Functions
  *********************************/
 void start_game() {
     game_state = STARTED;
-    sync_game_state();
-    rotate_platform(180);
+    //sync_game_state();
+    rotate_platform(0);
     set_card_flipper_regular();
 }
 
 void detect_players() {
     game_state = SCANNING_PLAYERS;
-    sync_game_state();
-
-    for (int pos = 0; pos >= 180; pos += 20) { // goes from 180 degrees to 0 degrees
+    //sync_game_state();
+    for (int pos = 0; pos <= 180; pos += 18) { // goes from 180 degrees to 0 degrees - 18 degrees jump.
         rotate_platform(pos);
+        delay(500);
         if(is_player_detected_and_range() != -1) {
-            player_angles[player_num] = pos;
-            player_num++;
+            if (player_num >0 ){
+                if (player_angles[player_num-1] + 18 != pos){ //doesnt allow 2 players to be too close - at least 36 degrees between them.
+                    player_angles[player_num] = pos;
+                    Serial.println(pos);
+                    player_num++;
+                }
+            }
+            else{
+                player_angles[player_num] = pos;
+                Serial.println(pos);
+                player_num++;
+            }
         }
         if (player_num == 4){
             break;
         }
-        delay(200);
     }
-
     rotate_platform(90);
     game_state = SCANNED_PLAYERS;
-    sync_game_state();
+    //sync_game_state();
     Serial.println("Scanned All players");
 }
 
 void start_round() {
+    // player_num =3;
+    // player_angles[0] = 0;
+    // player_angles[1] = 36;
+    // player_angles[2] = 90;
     for(int i = 0; i < 4; i++) {
         if(player_angles[i] >= 0) {
             deal_card(false, player_angles[i]);
+            delay(500);
             deal_card(false, player_angles[i]);
         }
+        delay(200);
     }
     rotate_platform(90);
+    set_card_flipper_regular();
     game_state = ROUND_STARTED;
-    sync_game_state();
+    //sync_game_state();
 }
 
 void show_card() {
@@ -353,9 +336,10 @@ void reset() {
         player_angles[i] = -1;
     }
     player_num = 0;
+    rotate_platform(0);
+    current_degree = 0;
     sync_game_state();
 }
-
 
 /*********************************
  * Setup
@@ -377,18 +361,10 @@ void setup() {
  * Loop
  *********************************/
 void loop() {
-    is_card_facing_up();
-    delay(2000);
-
-    // set_card_flipper_flipped();
-
+    start_round();
+    delay(5000);
+    // push_card_out();
     // delay(5000);
-    
-    // set_card_flipper_regular();
-
-    // delay(5000);
-    
-
     /*
     int command_packet = read_packet();
     if(command_packet != -1) {
@@ -423,15 +399,9 @@ void loop() {
                 reset();
                 break;
         }
-
-        
     } 
-    
     sync_game_state();
-        
-
     delay(100);
     */
-
 }
 
