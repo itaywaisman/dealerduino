@@ -117,12 +117,12 @@ void sync_game_state() {
 
 void push_card_out(){
     card_pusher_servo.write(60);
-    delay(340);
+    delay(385);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, HIGH);
     delay(200);
     card_pusher_servo.write(90);
-    delay(500);
+    delay(1250);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, LOW);
 }
@@ -143,7 +143,7 @@ void rotate_platform(int target_degree) {
         // Makes 200 pulses for making one full cycle rotation
         for(int x = 0; x < how_much_to_move; x++) {
             digitalWrite(STEPPER_STEP,HIGH); 
-            delay(60); 
+            delay(80); 
             digitalWrite(STEPPER_STEP,LOW); 
         }
    }
@@ -151,10 +151,11 @@ void rotate_platform(int target_degree) {
         digitalWrite(STEPPER_DIRECTION,LOW); //Changes the rotations direction
         for(int x = 0; x < how_much_to_move; x++) {
             digitalWrite(STEPPER_STEP,HIGH);
-            delay(60);
+            delay(80);
             digitalWrite(STEPPER_STEP,LOW);
         }
    }
+   digitalWrite(STEPPER_STEP,HIGH); 
    current_degree = target_degree;
 }
 
@@ -208,7 +209,7 @@ boolean is_card_facing_up() {
     Serial.print(green_value);
     Serial.println();
     if (blue_value <= 21 and green_value <= 21 and red_value <= 21){
-      if ((blue_value >= 16 and green_value >= 16 ) or (blue_value >= 16 and red_value >= 16) or (green_value >= 16 and red_value >= 16) ){
+      if ((blue_value >= 17 and green_value >= 17 ) or (blue_value >= 17 and red_value >= 17) or (green_value >= 17 and red_value >= 17) ){
         Serial.println("CARD FACING UP! ");
        return true;
       }
@@ -221,25 +222,25 @@ boolean is_card_facing_up() {
 void deal_regular(int target_angle) {
 
     rotate_platform(target_angle);
-    delay(400);
+    delay(300);
 
     set_card_flipper_regular();
-    delay(400);
+    delay(900);
     
     push_card_out();
-    delay(400);
+    delay(300);
 }
 
 void deal_flipped(int target_angle) {
 
     rotate_platform((180 + target_angle) %360);
-    delay(400);
+    delay(300);
 
     set_card_flipper_flipped();
-    delay(400);
+    delay(900);
 
     push_card_out();
-    delay(400);
+    delay(300);
 }
 
 void deal_card(boolean is_open, int target_angle) {
@@ -266,6 +267,7 @@ void deal_card(boolean is_open, int target_angle) {
 void start_game() {
     game_state = STARTED;
     //sync_game_state();
+    digitalWrite(STEPPER_STEP,HIGH); 
     rotate_platform(0);
     set_card_flipper_regular();
 }
@@ -319,10 +321,30 @@ void start_round() {
     //sync_game_state();
 }
 
-void show_card() {
-    deal_card(true, 90);
-    game_state = game_state + 1;
-    sync_game_state();
+void show_cards_round_1() {
+    deal_card(false, 115);
+    deal_card(true, 105);
+    deal_card(true, 95);
+    deal_card(true, 85);
+
+    // game_state = game_state + 1;
+    // sync_game_state();
+}
+
+void show_cards_round_2() {
+    deal_card(false, 115);
+    deal_card(true, 75);
+    
+    // game_state = game_state + 1;
+    // sync_game_state();
+}
+
+void show_cards_round_3() {
+    deal_card(false, 115);
+    deal_card(true, 65);
+    
+    // game_state = game_state + 1;
+    // sync_game_state();
 }
 
 void player_quit(int player_idx) {
@@ -338,7 +360,7 @@ void reset() {
     player_num = 0;
     rotate_platform(0);
     current_degree = 0;
-    sync_game_state();
+    // sync_game_state();
 }
 
 /*********************************
@@ -361,9 +383,15 @@ void setup() {
  * Loop
  *********************************/
 void loop() {
-    start_round();
-    delay(5000);
-    // push_card_out();
+    deal_card(false, 0);
+    delay(1000);
+    // show_cards_round_1();
+    // delay(5000);
+    // rotate_platform(0);
+    // show_cards_round_2();
+    // delay(5000);
+    // rotate_platform(0);
+    // show_cards_round_3();
     // delay(5000);
     /*
     int command_packet = read_packet();
