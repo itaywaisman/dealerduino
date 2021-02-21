@@ -122,12 +122,11 @@ void set_is_working(bool value) {
 
 void push_card_out(){
     card_pusher_servo.write(60);
-    delay_busy(385);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, HIGH);
-    delay_busy(200);
+    delay_busy(400);
     card_pusher_servo.write(90);
-    delay_busy(1250);
+    delay_busy(1300);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, LOW);
 }
