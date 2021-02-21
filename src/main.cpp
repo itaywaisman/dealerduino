@@ -117,12 +117,11 @@ void sync_game_state() {
 
 void push_card_out(){
     card_pusher_servo.write(60);
-    delay(385);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, HIGH);
-    delay(200);
+    delay(400);
     card_pusher_servo.write(90);
-    delay(1250);
+    delay(1300);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, LOW);
 }
@@ -383,8 +382,10 @@ void setup() {
  * Loop
  *********************************/
 void loop() {
-    deal_card(false, 0);
-    delay(1000);
+    deal_card(true,0);
+    delay(5000);
+    // detect_players();
+    // delay(4000);
     // show_cards_round_1();
     // delay(5000);
     // rotate_platform(0);
