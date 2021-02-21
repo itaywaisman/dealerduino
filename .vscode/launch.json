@@ -12,9 +12,9 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug",
-            "executable": "c:/Users/LIORD/CLionProjects/untitled/.pio/build/uno/firmware.elf",
+            "executable": "C:/git_repos/dealerduino/.pio/build/uno/firmware.elf",
             "projectEnvName": "uno",
-            "toolchainBinDir": "C:/Users/LIORD/.platformio/packages/toolchain-atmelavr/bin",
+            "toolchainBinDir": "C:/Users/itayw/.platformio/packages/toolchain-atmelavr/bin",
             "preLaunchTask": {
                 "type": "PlatformIO",
                 "task": "Pre-Debug (uno)"
@@ -25,9 +25,9 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (skip Pre-Debug)",
-            "executable": "c:/Users/LIORD/CLionProjects/untitled/.pio/build/uno/firmware.elf",
+            "executable": "C:/git_repos/dealerduino/.pio/build/uno/firmware.elf",
             "projectEnvName": "uno",
-            "toolchainBinDir": "C:/Users/LIORD/.platformio/packages/toolchain-atmelavr/bin",
+            "toolchainBinDir": "C:/Users/itayw/.platformio/packages/toolchain-atmelavr/bin",
             "internalConsoleOptions": "openOnSessionStart"
         }
     ]
