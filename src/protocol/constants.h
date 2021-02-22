@@ -3,6 +3,9 @@
 
 #define TRANSMIT_RETRIES 3
 
+#define START_SEQ_LENGTH 2
+#define END_SEQ_LENGTH 2
+
 #define MAX_NUM_OF_PLAYERS 4
 
 #define GAME_STATE_NOT_STARTED             0x000
@@ -32,16 +35,20 @@
 
 #define LOG_LENGTH 32
 
+
 typedef struct __attribute__((__packed__)) client_packet_t {
-    uint8_t command_num;
+    uint8_t checksum;
+    uint8_t ack;
+    uint8_t packet_num;
     uint8_t command;
     uint8_t arg1;
     uint8_t arg2;
 }* ClientPacket;
 
 typedef struct __attribute__((__packed__)) server_packet_t {
+    uint8_t checksum;
+    uint8_t ack;
     uint8_t packet_num;
-    uint8_t reset_flag;
     uint8_t game_state;
     uint8_t is_working;
     uint8_t num_of_players;

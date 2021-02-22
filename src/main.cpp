@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdarg.h>
 #include "Arduino.h"
 #include <Servo.h>
 #include <Stepper.h>
@@ -27,6 +29,13 @@
 #define CARD_FLIPPER_REGULAR 0
 #define CARD_FLIPPER_INSERT 180
 
+
+
+#define DEBUG_DEALER
+
+
+
+
 String serialResponse; // complete message from arduino, which consists of snesors data
 VL53L1X distance_sensor;
 Servo card_flipping_servo;
@@ -43,8 +52,7 @@ int current_degree = 0;
 
 
 void setup_server() {
-    Serial.begin(9600);
-    server = new SerialServer(RX, TX);
+    server = new SerialServer();
 }
 
 void setup_dc_motors() {
@@ -62,7 +70,6 @@ void setup_proximity_sensor_and_color_sensor() { //there is no setup for color
     Wire.setClock(400000); // use 400 kHz I2C
     if (!distance_sensor.init())
     {
-        Serial.println("Failed to detect and initialize sensor!");
         while (1);
     }
 
@@ -76,14 +83,16 @@ void setup_servos() {
     card_pusher_servo.attach(CARD_PUSHER_OUT);
 }
 
+
+
 /*********************************
  * State methods
  *********************************/
 
-long previousMillis = 0;
+unsigned long previousMillis = 0;
 
-long sync_interval = 100;
-long last_sync_time = 0;
+unsigned long sync_interval = 50;
+unsigned long last_sync_time = 0;
 
 void sync_if_needed() {
     unsigned long currentMillis = millis();
@@ -112,9 +121,46 @@ void delay_busy(unsigned long ms) {
 
 void set_is_working(bool value) {
     is_working = true;
-    sync_if_needed();
 }
 
+/*********************************
+ * logging methods
+ *********************************/
+
+void level_logf(char* format, char* level, ...) {
+    char buffer[LOG_LENGTH];
+    memset(&buffer[0], 0, sizeof(buffer));
+    va_list args;
+    va_start (args, format);
+    vsprintf (buffer,format, args);
+    va_end (args);
+
+    char final_buffer[LOG_LENGTH];
+    sprintf(final_buffer, "%s|%s", level, buffer);
+
+    server->set_log(final_buffer);
+}
+
+void debug_logf(char* format, ...) {
+    va_list args;
+    va_start (args, format);
+    level_logf(format, "DBG", args);
+    va_end (args);
+}
+
+void info_logf(char* format, ...) {
+    va_list args;
+    va_start (args, format);
+    level_logf(format, "INF", args);
+    va_end (args);
+}
+
+void error_logf(char* format, ...) {
+    va_list args;
+    va_start (args, format);
+    level_logf(format, "ERR", args);
+    va_end (args);
+}
 
 /*********************************
  * Hardware methods
@@ -166,8 +212,8 @@ void rotate_platform(int target_degree) {
 int read_proximity_sensor() {
     distance_sensor.read();
     int range_in_mm = distance_sensor.ranging_data.range_mm;
-    Serial.print("The range in mm is: ");
-    Serial.println(range_in_mm);
+    // Serial.print("The range in mm is: ");
+    // Serial.println(range_in_mm);
     return range_in_mm;
 }
 
@@ -194,7 +240,6 @@ boolean is_card_facing_up() {
 
     digitalWrite(s2,LOW);
     digitalWrite(s3,HIGH);
-    //Serial.print("Blue value= ");
     int blue_value = read_color_sensor();
     delay_busy(20);
 
@@ -202,22 +247,12 @@ boolean is_card_facing_up() {
     digitalWrite(s3,HIGH);
     int green_value = read_color_sensor();
     delay_busy(20);
-    Serial.println("COLORS:");
-    Serial.print(" RED: ");
-    Serial.print(red_value);
-    Serial.println();
-    Serial.print(" BLUE: ");
-    Serial.print(blue_value);
-    Serial.println();
-    Serial.print(" GREEN: ");
-    Serial.print(green_value);
-    Serial.println();
     if (blue_value <= 21 and green_value <= 21 and red_value <= 21){
       if ((blue_value >= 17 and green_value >= 17 ) or (blue_value >= 17 and red_value >= 17) or (green_value >= 17 and red_value >= 17) ){
-        Serial.println("CARD FACING UP! ");
+        // Serial.println("CARD FACING UP! ");
        return true;
       }
-    Serial.println("CARD FACING DOWN! ");
+    // Serial.println("CARD FACING DOWN! ");
     return false;
     }
     return false;
@@ -270,18 +305,32 @@ void deal_card(boolean is_open, int target_angle) {
  *********************************/
 void start_game() {
     game_state = GAME_STATE_STARTED;
+    info_logf("STARTING GAME");
     set_is_working(true);
+    server->send();
     
+    #ifndef DEBUG_DEALER
     digitalWrite(STEPPER_STEP,HIGH); 
     rotate_platform(0);
     set_card_flipper_regular();
+    #endif
+
+    #ifdef DEBUG_DEALER
+    delay_busy(1000);
+    #endif
+
     set_is_working(false);
+    info_logf("GAME STARTED");
+    server->send();
 }
 
 void detect_players() {
+    info_logf("DET START");
     game_state = GAME_STATE_SCANNING_PLAYERS;
     set_is_working(true);
-    
+    server->send();
+
+    #ifndef DEBUG_DEALER
     for (int pos = 0; pos <= 180; pos += 18) { // goes from 180 degrees to 0 degrees - 18 degrees jump.
         rotate_platform(pos);
         delay_busy(500);
@@ -289,13 +338,13 @@ void detect_players() {
             if (num_of_players >0 ){
                 if (player_angles[num_of_players-1] + 18 != pos){ //doesnt allow 2 players to be too close - at least 36 degrees between them.
                     player_angles[num_of_players] = pos;
-                    Serial.println(pos);
+                    info_logf("DET [%d]", pos);
                     num_of_players++;
                 }
             }
             else{
                 player_angles[num_of_players] = pos;
-                Serial.println(pos);
+                info_logf("DET [%d]", pos);
                 num_of_players++;
             }
         }
@@ -304,13 +353,25 @@ void detect_players() {
         }
     }
     rotate_platform(90);
+    #endif
+
+    #ifdef DEBUG_DEALER
+    delay_busy(1000);
+    #endif
+
     game_state = GAME_STATE_SCANNED_PLAYERS;
     set_is_working(false);
+    info_logf("DET END");
+    server->send();
 }
 
 void start_round() {
+    info_logf("NEWROUND START");
     game_state = GAME_STATE_ROUND_STARTING;
     set_is_working(true);
+    server->send();
+
+    #ifndef DEBUG_DEALER
     for(int i = 0; i < 4; i++) {
         if(player_angles[i] >= 0) {
             deal_card(false, player_angles[i]);
@@ -321,38 +382,87 @@ void start_round() {
     }
     rotate_platform(90);
     set_card_flipper_regular();
+    #endif
+
+    #ifdef DEBUG_DEALER
+    delay_busy(1000);
+    #endif
+
     game_state = GAME_STATE_ROUND_STARTED;
-    //sync_game_state();
     set_is_working(false);
+    info_logf("NEWROUND END");
+    server->send();
 }
 
 void show_cards_round_1() {
+    info_logf("SHOW1 START");
     game_state = GAME_STATE_DEALING_CARD_1;
     set_is_working(true);
+    server->send();
+
+    #ifndef DEBUG_DEALER
+
     deal_card(false, 115);
     deal_card(true, 105);
     deal_card(true, 95);
     deal_card(true, 85);
+
+    #endif
+
+    #ifdef DEBUG_DEALER
+    delay_busy(1000);
+    #endif
+
     game_state = GAME_STATE_DEALT_CARD_1;
     set_is_working(false);
+    info_logf("SHOW1 END");
+    server->send();
 }
 
 void show_cards_round_2() {
+    info_logf("SHOW2 START");
     game_state = GAME_STATE_DEALING_CARD_2;
     set_is_working(true);
+    server->send();
+
+    #ifndef DEBUG_DEALER
+
     deal_card(false, 115);
     deal_card(true, 75);
+
+    #endif
+
+    #ifdef DEBUG_DEALER
+    delay_busy(1000);
+    #endif
+
     game_state = GAME_STATE_DEALT_CARD_2;
     set_is_working(false);
+    info_logf("SHOW2 END");
+    server->send();
 }
 
 void show_cards_round_3() {
+    info_logf("SHOW3 START");
     game_state = GAME_STATE_DEALING_CARD_3;
     set_is_working(true);
+    server->send();
+
+    #ifndef DEBUG_DEALER
+
     deal_card(false, 115);
     deal_card(true, 65);
+
+    #endif
+
+    #ifdef DEBUG_DEALER
+    delay_busy(1000);
+    #endif
+
     game_state = GAME_STATE_DEALT_CARD_3;
     set_is_working(false);
+    info_logf("SHOW3 END");
+    server->send();
 }
 
 void player_quit(int player_idx) {
@@ -361,15 +471,29 @@ void player_quit(int player_idx) {
 }
 
 void reset() {
+    info_logf("RESETING...");
     set_is_working(true);
-    game_state = GAME_STATE_NOT_STARTED;
+    server->send();
+
+    #ifndef DEBUG_DEALER
+
     for(int i = 0; i < 4; i++) {
         player_angles[i] = -1;
     }
     num_of_players = 0;
     rotate_platform(0);
     current_degree = 0;
+    game_state = GAME_STATE_NOT_STARTED;
+
+    #endif
+
+    #ifdef DEBUG_DEALER
+    delay_busy(1000);
+    #endif
+
     set_is_working(false);
+    info_logf("RESET");
+    server->send();
 }
 
 /*********************************
@@ -377,21 +501,35 @@ void reset() {
  *********************************/
 void setup() {
     setup_server();
+    #ifndef DEBUG_DEALER
     setup_servos();
     setup_dc_motors();
     setup_stepper();
     setup_proximity_sensor_and_color_sensor();
+    #endif
 }
 
 /*********************************
  * Loop
  *********************************/
 void loop() {
-    // deal_card(false, 0);
     if(server->command_available()) {
+        
         int command = server->get_command();
         int arg1 = server->get_arg1();
         int arg2 = server->get_arg2();
+
+        if(command != COMMAND_DO_NOTHING) {
+            pinMode(LED_BUILTIN, OUTPUT);
+            for(int i = 0; i< 10; i++) {
+                digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+                delay_busy(100);                       // wait for a second
+                digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
+                delay_busy(100); 
+            }
+
+            server->flush();
+        }
 
         switch (command) {
             case COMMAND_START_GAME:
@@ -422,4 +560,6 @@ void loop() {
         }
     }
     sync_if_needed();
+    delay_busy(10);
+    
 }

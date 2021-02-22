@@ -1,18 +1,40 @@
 #include "./protocol/server.h"
+#include "protocol/utils.h"
 
-SerialServer::SerialServer(int rx, int tx, int baud = 9600) 
-: serial(rx, tx) {
-    pinMode(tx, OUTPUT);
-    pinMode(rx, INPUT);
+SerialServer::SerialServer() {
+    this->serial = &Serial;
     for(int i = 0 ; i < LOG_LENGTH; i++) this->stored_log[i] = 0;
-    this->serial.begin(baud);
+    this->serial->begin(9600);
     
 }
+
+const unsigned long timeout = 1000;
 
 void SerialServer::sync() {
     this->receive_bytes();
     this->parse_bytes();
-    this->send_bytes();
+    // if(!this->last_transmit_ok) {
+    //     if(millis() - this->last_transmit_time > timeout) {
+    //         if(retransmit_count < TRANSMIT_RETRIES)
+    //             this->send_bytes(0, this->last_transmit_packet.packet_num, this->last_transmit_packet.game_state, this->last_transmit_packet.is_working, this->last_transmit_packet.num_of_players, this->last_transmit_packet.log);
+    //         else
+    //             last_transmit_ok = true; // DUMP the packet and move on
+    //     }
+    // } else {
+    //     this->retransmit_count = 0;
+        
+    // }
+}
+
+void SerialServer::send() {
+     this->send_bytes(0, rand(), this->stored_game_state, this->stored_is_working, this->stored_num_of_players, this->stored_log);
+}
+
+void SerialServer::flush() {
+    this->is_command_available = false;
+    this->current_command = COMMAND_DO_NOTHING;
+    this->current_command_arg1 = 0;
+    this->current_command_arg2 = 0;
 }
 
 boolean SerialServer::command_available() {
@@ -59,8 +81,11 @@ void SerialServer::receive_bytes() {
     // Read buffer
     byte rb;
 
-    while (this->serial.available() > 0 && has_new_data == false) {
-        rb = this->serial.read();
+    int start_marker_count = 0;
+    int end_marker_count = 0;
+
+    while (this->serial->available() > 0 && has_new_data == false) {
+        rb = this->serial->read();
 
         if (recvInProgress == true) {
             if (rb != endMarker) {
@@ -71,55 +96,109 @@ void SerialServer::receive_bytes() {
                 }
             }
             else {
-                recvInProgress = false;
-                this->num_bytes_received = ndx;  // save the number for use when printing
-                ndx = 0;
-                this->has_new_data = true;
+                end_marker_count+=1;
+                if(end_marker_count == END_SEQ_LENGTH) {
+                    recvInProgress = false;
+                    this->num_bytes_received = ndx;  // save the number for use when printing
+                    ndx = 0;
+                    this->has_new_data = true;
+                }
             }
         }
 
         else if (rb == startMarker) {
-            recvInProgress = true;
+            start_marker_count+=1;
+            if(start_marker_count == START_SEQ_LENGTH) {
+                recvInProgress = true;
+            }
         }
     }
 }
 
+bool SerialServer::validate_packet() {
+    client_packet_t* packet = (client_packet_t*)this->received_bytes;
+        
+    const byte* data = (byte*)&packet + sizeof(uint8_t); //skip packet_num and checksum values
+    uint8_t checksum = calc_checksum(data, sizeof(client_packet_t) - sizeof(uint8_t));
+
+    // return checksum == packet->checksum;
+    return true;
+}
+
 void SerialServer::parse_bytes(){
     if (this->has_new_data == true) {
+        if(validate_packet()) {
+            client_packet_t* packet = (client_packet_t*)this->received_bytes;
+            
+            // Serial.println();
+            // Serial.print("GOT PACKET packet_num: ");
+            // Serial.print(packet->packet_num);
+            // for(int i = 0 ; i < sizeof(client_packet_t); i++) Serial.print(received_bytes[i]);
+            // Serial.println();
 
-        client_packet_t* data = (client_packet_t*)this->received_bytes;
-        
-        if(data->command_num > this->current_command_num) {
-            this->current_command = data->command_num;
-            this->current_command_arg1 = data->arg1;
-            this->current_command_arg2 = data->arg2;
-            this->current_command_num = data->command_num;
-            this->is_command_available = true;
+            // if(packet->ack == 1) {
+            //     this->last_transmit_ok = packet->packet_num == last_transmit_packet.packet_num;
+
+            //     this->stored_game_state = 0;
+            //     this->stored_is_working = 0;
+            //     this->stored_num_of_players = 0;
+            //     for(int i = 0 ; i < LOG_LENGTH; i++) this->stored_log[i] = 0;
+            // } else {
+                this->current_command = packet->command;
+                this->current_command_arg1 = packet->arg1;
+                this->current_command_arg2 = packet->arg2;
+                this->is_command_available = true;
+
+                
+
+            //     // Acknowledge packet
+            //     this->send_bytes(1, packet->packet_num, 0, 0, 0, "");
+            // }       
+
+            
         }
 
         this->has_new_data = false;
     }
 }
 
-void SerialServer::send_bytes() {
-    server_packet_t state = {};
-    state.packet_num = this->stored_packet_num + 1;
-    state.game_state = this->stored_game_state;
-    state.is_working = this->stored_is_working ? 1 : 0;
-    state.num_of_players = this->stored_num_of_players;
-    for(int i = 0 ; i < LOG_LENGTH; i++) state.log[i] = this->stored_log[i];
+void SerialServer::send_bytes(uint8_t ack, uint8_t packet_num, uint8_t game_state, uint8_t is_working, uint8_t num_of_players, char* log) {
+    server_packet_t packet = {};
+    packet.ack = ack;
+    packet.packet_num = packet_num;
+    packet.game_state = game_state;
+    packet.is_working = is_working;
+    packet.num_of_players = num_of_players;
+    for(int i = 0 ; i < LOG_LENGTH; i++) packet.log[i] = log[i];
     
+    const byte* data = (byte*)&packet + sizeof(uint8_t); //skip packet_num and checksum values
+    packet.checksum = calc_checksum(data, sizeof(server_packet_t) - sizeof(uint8_t));
+
     byte startMarker = 0x3C; // >
     byte endMarker = 0x3E; // <
 
-    for(int r = TRANSMIT_RETRIES; r > 0; r--) {
-        Serial.write(startMarker);
-        int n_transmitted = Serial.write((byte*)&state, sizeof(state));
-        Serial.write(endMarker);
-        if(n_transmitted == sizeof(state)) break;
-    }
+    for(int i=0; i<START_SEQ_LENGTH; i++) this->serial->write(startMarker);
+    int n_transmitted = this->serial->write((byte*)&packet, sizeof(packet));
+    for(int i=0; i<END_SEQ_LENGTH; i++) this->serial->write(endMarker);
+
+    for(int i = 0 ; i < sizeof(client_packet_t); i++) Serial.print(((byte*)&packet)[i]);
+
     
-    this->stored_packet_num = state.packet_num;
-    this->stored_reset_flag = 0;
     for(int i = 0 ; i < LOG_LENGTH; i++) this->stored_log[i] = 0;
+
+    // if(ack == 0) {
+    //     this->retransmit_count += 1;
+    //     this->last_transmit_packet = packet;
+    //     this->last_transmit_time = millis();
+    //     this->last_transmit_ok = false;
+    // } else {
+    //     this->last_transmit_ok = true;
+    //     Serial.println();
+    //     Serial.print("ACK ack: %d ");
+    //     Serial.print(ack);
+    //     Serial.print("packet_num: "); 
+    //     Serial.print(packet_num);
+    //     Serial.println();
+
+    // }
 }

@@ -83,13 +83,11 @@ class SerialClient {
     private:
         SoftwareSerial serial;
 
-        int stored_command_num = -1;
         int stored_command = COMMAND_DO_NOTHING;
         int stored_command_arg1 = 0;
         int stored_command_arg2 = 0;
 
         boolean is_state_available = false;
-        int current_packet_num = 0;
         int current_game_state = GAME_STATE_NOT_STARTED;
         bool current_is_working = false;
         int current_num_of_players = 0;
@@ -101,9 +99,15 @@ class SerialClient {
 
         boolean has_new_data = false;
 
+        bool last_transmit_ok = true;
+        unsigned long last_transmit_time = 0;
+        client_packet_t last_transmit_packet;
+        int retransmit_count = 0;
+
         void receive_bytes();
+        bool validate_packet();
         void parse_bytes();
-        void send_bytes();
+        void send_bytes(uint8_t ack, uint8_t packet_num, uint8_t command, uint8_t arg1, uint8_t arg2);
 };
 
 

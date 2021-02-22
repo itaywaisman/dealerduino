@@ -1,5 +1,5 @@
-#ifndef server_h
-#define server_h
+#ifndef serial_server_h
+#define serial_server_h
 
 #include "Arduino.h"
 #include <SoftwareSerial.h>
@@ -16,7 +16,7 @@ class SerialServer {
          * <param> tx - the tx port for serial communication
          * <param> baud - the baud rate for serial communication
          */
-        SerialServer(int rx, int tx, int baud = 9600);
+        SerialServer();
 
         /**
          * <desc>
@@ -24,6 +24,8 @@ class SerialServer {
          * This sends the current state to the client even if it didn't change.
          */
         void sync();
+        void send();
+        void flush();
 
         /**
          * <desc>
@@ -77,17 +79,14 @@ class SerialServer {
         void set_log(char log[LOG_LENGTH]);
 
     private:
-        SoftwareSerial serial;
+        HardwareSerial* serial;
 
         boolean is_command_available = false;
 
-        int current_command_num = -1;
         int current_command = COMMAND_DO_NOTHING;
         int current_command_arg1 = 0;
         int current_command_arg2 = 0;
 
-        int stored_packet_num = 0;
-        int stored_reset_flag = 1;
         int stored_game_state = GAME_STATE_NOT_STARTED;
         bool stored_is_working = false;
         int stored_num_of_players = 0;
@@ -99,9 +98,15 @@ class SerialServer {
 
         boolean has_new_data = false;
 
+        bool last_transmit_ok = true;
+        unsigned long last_transmit_time = 0;
+        server_packet_t last_transmit_packet;
+        int retransmit_count = 0;
+
         void receive_bytes();
+        bool validate_packet();
         void parse_bytes();
-        void send_bytes();
+        void send_bytes(uint8_t ack, uint8_t packet_num, uint8_t game_state, uint8_t is_working, uint8_t num_of_players, char* log);
 };
 
 #endif
