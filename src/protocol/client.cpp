@@ -48,6 +48,9 @@ void SerialClient::set_arg2(int arg2) {
     this->stored_command_arg2 = arg2;
 }
 
+int SerialClient::get_machine_state() {
+    return this->current_machine_state;
+}
 
 int SerialClient::get_game_state() {
     return this->current_game_state;
@@ -141,6 +144,7 @@ void SerialClient::parse_bytes(){
             //     this->last_transmit_ok = packet->packet_num == last_transmit_packet.packet_num;
             //     Serial.printf("GOT ACK packet_num: %d command: %d\n", packet->packet_num, last_transmit_packet.command);
             // } else {
+                this->current_machine_state = packet->machine_state;
                 this->current_game_state = packet->game_state;
                 this->current_is_working = packet->is_working == 1;
                 this->current_num_of_players = packet->num_of_players;

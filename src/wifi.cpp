@@ -6,8 +6,8 @@
 #include "protocol/client.h"
 
 
-#define WIFI_SSID "Pitzim"
-#define WIFI_PASS "01020710"
+#define WIFI_SSID "DESKTOP-P01MN4L 6138"
+#define WIFI_PASS "80C179>t"
 
 #define FIREBASE_HOST "dealerduino-default-rtdb.firebaseio.com"
 #define FIREBASE_AUTH "dtPlzFgFKK3fErpaby8LKk00QvMwrh0JY1H9QHuz"
@@ -118,11 +118,15 @@ void print_log() {
 }
 
 void save_state() {
+    int machine_state = client->get_machine_state();
     int game_state = client->get_game_state();
     int num_players = client->get_num_of_players();
     
+    Serial.printf("Current state: %d %d %d\n", machine_state, game_state, num_players);
+
     stateData.clear();
-    stateData.set("game_state", game_state);
+    stateData.set("machine_state", machine_state);
+    if(game_state != GAME_STATE_NOT_STARTED) stateData.set("game_state", game_state);
     stateData.set("player_num", num_players);
 
     if(!Firebase.updateNode(fbdo, "/state", stateData)) {

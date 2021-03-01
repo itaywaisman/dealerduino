@@ -27,7 +27,8 @@ void SerialServer::sync() {
 }
 
 void SerialServer::send() {
-     this->send_bytes(0, rand(), this->stored_game_state, this->stored_is_working, this->stored_num_of_players, this->stored_log);
+    this->send_bytes(0, rand(), this->stored_machine_state, this->stored_game_state, this->stored_is_working, this->stored_num_of_players, this->stored_log);
+    this->stored_game_state = GAME_STATE_NOT_STARTED;
 }
 
 void SerialServer::flush() {
@@ -56,6 +57,9 @@ int SerialServer::get_arg2() {
     return this->current_command_arg2;
 }
 
+void SerialServer::set_machine_state(int machine_state) {
+    this->stored_machine_state = machine_state;
+}
 
 void SerialServer::set_game_state(int game_state) {
     this->stored_game_state = game_state;
@@ -162,10 +166,11 @@ void SerialServer::parse_bytes(){
     }
 }
 
-void SerialServer::send_bytes(uint8_t ack, uint8_t packet_num, uint8_t game_state, uint8_t is_working, uint8_t num_of_players, char* log) {
+void SerialServer::send_bytes(uint8_t ack, uint8_t packet_num, uint8_t machine_state, uint8_t game_state, uint8_t is_working, uint8_t num_of_players, char* log) {
     server_packet_t packet = {};
     packet.ack = ack;
     packet.packet_num = packet_num;
+    packet.machine_state = machine_state;
     packet.game_state = game_state;
     packet.is_working = is_working;
     packet.num_of_players = num_of_players;

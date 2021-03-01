@@ -56,6 +56,13 @@ class SerialClient {
          */
         void set_arg2(int arg2);
 
+
+        /**
+         * <desc>
+         * get the current game state.
+         */
+        int get_machine_state();
+
         /**
          * <desc>
          * get the current game state.
@@ -88,6 +95,7 @@ class SerialClient {
         int stored_command_arg2 = 0;
 
         boolean is_state_available = false;
+        int current_machine_state = MACHINE_STATE_IDLE;
         int current_game_state = GAME_STATE_NOT_STARTED;
         bool current_is_working = false;
         int current_num_of_players = 0;
