@@ -44,6 +44,7 @@ Servo card_pusher_servo;
 SerialServer* server;
 
 /// GAME STATE
+int machine_state = MACHINE_STATE_IDLE;
 int game_state = GAME_STATE_NOT_STARTED;
 bool is_working = false;
 int player_angles[4] = {-1, -1, -1, -1};
@@ -99,11 +100,16 @@ void sync_if_needed() {
     
     // check if we need to sync the state
     if(currentMillis - last_sync_time > sync_interval) {
-        server->set_game_state(game_state);
-        server->set_num_of_players(num_of_players);
         server->sync();
         last_sync_time =  currentMillis;
     }
+}
+
+void send() {
+    server->set_machine_state(machine_state);
+    server->set_game_state(game_state);
+    server->set_num_of_players(num_of_players);
+    server->send();
 }
 
 void delay_busy(unsigned long ms) {
@@ -166,14 +172,26 @@ void error_logf(char* format, ...) {
  * Hardware methods
  *********************************/
 
-void push_card_out(){
+void push_card_out_regular(){
+    digitalWrite(CARD_ACCELERATOR_1, LOW);
+    digitalWrite(CARD_ACCELERATOR_2, HIGH);
+    delay_busy(300);
+    card_pusher_servo.write(60);
+    delay_busy(500);
+    card_pusher_servo.write(90);
+    delay_busy(1400);
+    digitalWrite(CARD_ACCELERATOR_1, LOW);
+    digitalWrite(CARD_ACCELERATOR_2, LOW);
+}
+
+void push_card_out_flipped(){
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, HIGH);
     delay_busy(300);
     card_pusher_servo.write(60);
     delay_busy(400);
     card_pusher_servo.write(90);
-    delay_busy(1300);
+    delay_busy(1400);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, LOW);
 }
@@ -247,19 +265,19 @@ boolean is_card_facing_up() {
     digitalWrite(s2,HIGH);
     digitalWrite(s3,HIGH);
     int green_value = read_color_sensor();
-    //Serial.print("green: ");
-    //Serial.println(green_value);
-    //Serial.print("blue: ");
-    //Serial.println(red_value);
-    //Serial.print("red: ");
-    //Serial.println(blue_value);
+    Serial.print("green: ");
+    Serial.println(green_value);
+    Serial.print("blue: ");
+    Serial.println(red_value);
+    Serial.print("red: ");
+    Serial.println(blue_value);
     delay_busy(20);
     if (blue_value <= 27 and green_value <= 27 and red_value <= 27){
       if ((blue_value > 21 and green_value > 21 ) or (blue_value > 21 and red_value > 21) or (green_value > 21 and red_value > 21) ){
-        //Serial.println("CARD FACING UP! ");
+        Serial.println("CARD FACING UP! ");
        return true;
       }
-    //Serial.println("CARD FACING DOWN! ");
+    Serial.println("CARD FACING DOWN! ");
     return false;
     }
     return false;
@@ -273,7 +291,7 @@ void deal_regular(int target_angle) {
     set_card_flipper_regular();
     delay_busy(900);
     
-    push_card_out();
+    push_card_out_regular();
     delay_busy(300);
 }
 
@@ -285,7 +303,7 @@ void deal_flipped(int target_angle) {
     set_card_flipper_flipped();
     delay_busy(900);
 
-    push_card_out();
+    push_card_out_flipped();
     delay_busy(300);
 }
 
@@ -311,14 +329,14 @@ void deal_card(boolean is_open, int target_angle) {
  * Game Functions
  *********************************/
 void start_game() {
-    game_state = GAME_STATE_STARTED;
+    machine_state = MACHINE_STATE_RESETING;
     info_logf("STARTING GAME");
     set_is_working(true);
-    server->send();
+    send();
     
     #ifndef DEBUG_DEALER
     digitalWrite(STEPPER_STEP,HIGH); 
-    rotate_platform(0);
+    rotate_platform(0); 
     set_card_flipper_regular();
     #endif
 
@@ -326,16 +344,20 @@ void start_game() {
     delay_busy(1000);
     #endif
 
+    machine_state = MACHINE_STATE_IDLE;
+    game_state = GAME_STATE_STARTED;
     set_is_working(false);
     info_logf("GAME STARTED");
-    server->send();
+    send();
 }
 
 void detect_players() {
     info_logf("DET START");
-    game_state = GAME_STATE_SCANNING_PLAYERS;
+    machine_state = MACHINE_STATE_SCANNING_PLAYERS;
     set_is_working(true);
-    server->send();
+    send();
+
+    num_of_players = 0;
 
     #ifndef DEBUG_DEALER
     for (int pos = 0; pos <= 180; pos += 18) { // goes from 180 degrees to 0 degrees - 18 degrees jump.
@@ -366,17 +388,18 @@ void detect_players() {
     delay_busy(1000);
     #endif
 
+    machine_state = MACHINE_STATE_IDLE;
     game_state = GAME_STATE_SCANNED_PLAYERS;
     set_is_working(false);
     info_logf("DET END");
-    server->send();
+    send();
 }
 
 void start_round() {
     info_logf("NEWROUND START");
-    game_state = GAME_STATE_ROUND_STARTING;
+    machine_state = MACHINE_STATE_ROUND_STARTING;
     set_is_working(true);
-    server->send();
+    send();
 
     #ifndef DEBUG_DEALER
     for(int i = 0; i < 4; i++) {
@@ -395,17 +418,18 @@ void start_round() {
     delay_busy(1000);
     #endif
 
+    machine_state = MACHINE_STATE_IDLE;
     game_state = GAME_STATE_ROUND_STARTED;
     set_is_working(false);
     info_logf("NEWROUND END");
-    server->send();
+    send();
 }
 
 void show_cards_round_1() {
     info_logf("SHOW1 START");
-    game_state = GAME_STATE_DEALING_CARD_1;
+    machine_state = MACHINE_STATE_DEALING_CARD_1;
     set_is_working(true);
-    server->send();
+    send();
 
     #ifndef DEBUG_DEALER
 
@@ -420,17 +444,18 @@ void show_cards_round_1() {
     delay_busy(1000);
     #endif
 
+    machine_state = MACHINE_STATE_IDLE;
     game_state = GAME_STATE_DEALT_CARD_1;
     set_is_working(false);
     info_logf("SHOW1 END");
-    server->send();
+    send();
 }
 
 void show_cards_round_2() {
     info_logf("SHOW2 START");
-    game_state = GAME_STATE_DEALING_CARD_2;
+    machine_state = MACHINE_STATE_DEALING_CARD_2;
     set_is_working(true);
-    server->send();
+    send();
 
     #ifndef DEBUG_DEALER
 
@@ -443,17 +468,18 @@ void show_cards_round_2() {
     delay_busy(1000);
     #endif
 
+    machine_state = MACHINE_STATE_IDLE;
     game_state = GAME_STATE_DEALT_CARD_2;
     set_is_working(false);
     info_logf("SHOW2 END");
-    server->send();
+    send();
 }
 
 void show_cards_round_3() {
     info_logf("SHOW3 START");
-    game_state = GAME_STATE_DEALING_CARD_3;
+    machine_state = MACHINE_STATE_DEALING_CARD_3;
     set_is_working(true);
-    server->send();
+    send();
 
     #ifndef DEBUG_DEALER
 
@@ -466,10 +492,11 @@ void show_cards_round_3() {
     delay_busy(1000);
     #endif
 
+    machine_state = MACHINE_STATE_IDLE;
     game_state = GAME_STATE_DEALT_CARD_3;
     set_is_working(false);
     info_logf("SHOW3 END");
-    server->send();
+    send();
 }
 
 void player_quit(int player_idx) {
@@ -478,9 +505,10 @@ void player_quit(int player_idx) {
 }
 
 void reset() {
+    machine_state = MACHINE_STATE_RESETING;
     info_logf("RESETING...");
     set_is_working(true);
-    server->send();
+    send();
 
     #ifndef DEBUG_DEALER
 
@@ -490,17 +518,18 @@ void reset() {
     num_of_players = 0;
     rotate_platform(0);
     current_degree = 0;
+    machine_state = MACHINE_STATE_IDLE;
     game_state = GAME_STATE_NOT_STARTED;
-
     #endif
 
     #ifdef DEBUG_DEALER
     delay_busy(1000);
     #endif
 
+    machine_state = MACHINE_STATE_IDLE;
     set_is_working(false);
     info_logf("RESET");
-    server->send();
+    send();
 }
 
 /*********************************
@@ -520,55 +549,55 @@ void setup() {
  * Loop
  *********************************/
 void loop() {
-    detect_players();
-    delay(4000);
-    // if(server->command_available()) {
+    if(server->command_available()) {
         
-    //     int command = server->get_command();
-    //     int arg1 = server->get_arg1();
-    //     int arg2 = server->get_arg2();
+        int command = server->get_command();
+        int arg1 = server->get_arg1();
+        int arg2 = server->get_arg2();
 
-    //     if(command != COMMAND_DO_NOTHING) {
-    //         pinMode(LED_BUILTIN, OUTPUT);
-    //         for(int i = 0; i< 10; i++) {
-    //             digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-    //             delay_busy(100);                       // wait for a second
-    //             digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
-    //             delay_busy(100); 
-    //         }
+        #ifdef DEBUD_DEALER
+        if(command != COMMAND_DO_NOTHING) {
+            pinMode(LED_BUILTIN, OUTPUT);
+            for(int i = 0; i< 10; i++) {
+                digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+                delay_busy(100);                       // wait for a second
+                digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
+                delay_busy(100); 
+            }
 
-    //         server->flush();
-    //     }
+            server->flush();
+        }
+        #endif
 
-    //     switch (command) {
-    //         case COMMAND_START_GAME:
-    //             start_game();
-    //             break;
-    //         case COMMAND_SCAN_PLAYERS:
-    //             detect_players();
-    //             break;
-    //         case COMMAND_START_ROUND:
-    //             start_round();
-    //             break;
-    //         case COMMAND_SHOW_CARD_1:
-    //             show_cards_round_1();
-    //             break;
-    //         case COMMAND_SHOW_CARD_2:
-    //             show_cards_round_2();
-    //             break;
-    //         case COMMAND_SHOW_CARD_3:
-    //             show_cards_round_1();
-    //             break;
-    //         case COMMAND_PLAYER_QUIT:
-    //             int player_idx = arg1;
-    //             player_quit(player_idx);
-    //             break;
-    //         case COMMAND_RESET:
-    //             reset();
-    //             break;
-    //     }
-    // }
-    // sync_if_needed();
-    // delay_busy(10);
+        switch (command) {
+            case COMMAND_START_GAME:
+                start_game();
+                break;
+            case COMMAND_SCAN_PLAYERS:
+                detect_players();
+                break;
+            case COMMAND_START_ROUND:
+                start_round();
+                break;
+            case COMMAND_SHOW_CARD_1:
+                show_cards_round_1();
+                break;
+            case COMMAND_SHOW_CARD_2:
+                show_cards_round_2();
+                break;
+            case COMMAND_SHOW_CARD_3:
+                show_cards_round_1();
+                break;
+            case COMMAND_PLAYER_QUIT:
+                int player_idx = arg1;
+                player_quit(player_idx);
+                break;
+            case COMMAND_RESET:
+                reset();
+                break;
+        }
+    }
+    sync_if_needed();
+    delay_busy(10);
     
 }

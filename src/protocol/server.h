@@ -64,6 +64,12 @@ class SerialServer {
          * <desc>
          * Set the current game state.
          */
+        void set_machine_state(int machine_state);
+        
+        /**
+         * <desc>
+         * Set the current game state.
+         */
         void set_game_state(int game_state);
 
         /**
@@ -87,6 +93,7 @@ class SerialServer {
         int current_command_arg1 = 0;
         int current_command_arg2 = 0;
 
+        int stored_machine_state = MACHINE_STATE_IDLE;
         int stored_game_state = GAME_STATE_NOT_STARTED;
         bool stored_is_working = false;
         int stored_num_of_players = 0;
@@ -106,7 +113,7 @@ class SerialServer {
         void receive_bytes();
         bool validate_packet();
         void parse_bytes();
-        void send_bytes(uint8_t ack, uint8_t packet_num, uint8_t game_state, uint8_t is_working, uint8_t num_of_players, char* log);
+        void send_bytes(uint8_t ack, uint8_t packet_num, uint8_t macine_state, uint8_t game_state, uint8_t is_working, uint8_t num_of_players, char* log);
 };
 
 #endif
