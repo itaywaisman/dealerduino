@@ -31,7 +31,7 @@
 
 
 
-#define DEBUG_DEALER
+//#define DEBUG_DEALER
 
 
 
@@ -167,9 +167,10 @@ void error_logf(char* format, ...) {
  *********************************/
 
 void push_card_out(){
-    card_pusher_servo.write(60);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, HIGH);
+    delay_busy(300);
+    card_pusher_servo.write(60);
     delay_busy(400);
     card_pusher_servo.write(90);
     delay_busy(1300);
@@ -246,13 +247,19 @@ boolean is_card_facing_up() {
     digitalWrite(s2,HIGH);
     digitalWrite(s3,HIGH);
     int green_value = read_color_sensor();
+    //Serial.print("green: ");
+    //Serial.println(green_value);
+    //Serial.print("blue: ");
+    //Serial.println(red_value);
+    //Serial.print("red: ");
+    //Serial.println(blue_value);
     delay_busy(20);
-    if (blue_value <= 21 and green_value <= 21 and red_value <= 21){
-      if ((blue_value >= 17 and green_value >= 17 ) or (blue_value >= 17 and red_value >= 17) or (green_value >= 17 and red_value >= 17) ){
-        // Serial.println("CARD FACING UP! ");
+    if (blue_value <= 27 and green_value <= 27 and red_value <= 27){
+      if ((blue_value > 21 and green_value > 21 ) or (blue_value > 21 and red_value > 21) or (green_value > 21 and red_value > 21) ){
+        //Serial.println("CARD FACING UP! ");
        return true;
       }
-    // Serial.println("CARD FACING DOWN! ");
+    //Serial.println("CARD FACING DOWN! ");
     return false;
     }
     return false;
@@ -513,53 +520,55 @@ void setup() {
  * Loop
  *********************************/
 void loop() {
-    if(server->command_available()) {
+    detect_players();
+    delay(4000);
+    // if(server->command_available()) {
         
-        int command = server->get_command();
-        int arg1 = server->get_arg1();
-        int arg2 = server->get_arg2();
+    //     int command = server->get_command();
+    //     int arg1 = server->get_arg1();
+    //     int arg2 = server->get_arg2();
 
-        if(command != COMMAND_DO_NOTHING) {
-            pinMode(LED_BUILTIN, OUTPUT);
-            for(int i = 0; i< 10; i++) {
-                digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-                delay_busy(100);                       // wait for a second
-                digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
-                delay_busy(100); 
-            }
+    //     if(command != COMMAND_DO_NOTHING) {
+    //         pinMode(LED_BUILTIN, OUTPUT);
+    //         for(int i = 0; i< 10; i++) {
+    //             digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+    //             delay_busy(100);                       // wait for a second
+    //             digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
+    //             delay_busy(100); 
+    //         }
 
-            server->flush();
-        }
+    //         server->flush();
+    //     }
 
-        switch (command) {
-            case COMMAND_START_GAME:
-                start_game();
-                break;
-            case COMMAND_SCAN_PLAYERS:
-                detect_players();
-                break;
-            case COMMAND_START_ROUND:
-                start_round();
-                break;
-            case COMMAND_SHOW_CARD_1:
-                show_cards_round_1();
-                break;
-            case COMMAND_SHOW_CARD_2:
-                show_cards_round_2();
-                break;
-            case COMMAND_SHOW_CARD_3:
-                show_cards_round_1();
-                break;
-            case COMMAND_PLAYER_QUIT:
-                int player_idx = arg1;
-                player_quit(player_idx);
-                break;
-            case COMMAND_RESET:
-                reset();
-                break;
-        }
-    }
-    sync_if_needed();
-    delay_busy(10);
+    //     switch (command) {
+    //         case COMMAND_START_GAME:
+    //             start_game();
+    //             break;
+    //         case COMMAND_SCAN_PLAYERS:
+    //             detect_players();
+    //             break;
+    //         case COMMAND_START_ROUND:
+    //             start_round();
+    //             break;
+    //         case COMMAND_SHOW_CARD_1:
+    //             show_cards_round_1();
+    //             break;
+    //         case COMMAND_SHOW_CARD_2:
+    //             show_cards_round_2();
+    //             break;
+    //         case COMMAND_SHOW_CARD_3:
+    //             show_cards_round_1();
+    //             break;
+    //         case COMMAND_PLAYER_QUIT:
+    //             int player_idx = arg1;
+    //             player_quit(player_idx);
+    //             break;
+    //         case COMMAND_RESET:
+    //             reset();
+    //             break;
+    //     }
+    // }
+    // sync_if_needed();
+    // delay_busy(10);
     
 }
