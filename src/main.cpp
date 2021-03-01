@@ -31,7 +31,7 @@
 
 
 
-//#define DEBUG_DEALER
+// #define DEBUG_DEALER
 
 
 
@@ -51,6 +51,8 @@ int player_angles[4] = {-1, -1, -1, -1};
 int num_of_players = 0;
 int current_degree = 0;
 
+
+void set_card_flipper_regular();
 
 void setup_server() {
     server = new SerialServer();
@@ -82,6 +84,7 @@ void setup_proximity_sensor_and_color_sensor() { //there is no setup for color
 void setup_servos() {
     card_flipping_servo.attach(CARD_PLATFORM_FLIPPING_OUT);
     card_pusher_servo.attach(CARD_PUSHER_OUT);
+    set_card_flipper_regular();
 }
 
 
@@ -177,7 +180,7 @@ void push_card_out_regular(){
     digitalWrite(CARD_ACCELERATOR_2, HIGH);
     delay_busy(300);
     card_pusher_servo.write(60);
-    delay_busy(500);
+    delay_busy(470);
     card_pusher_servo.write(90);
     delay_busy(1400);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
@@ -204,6 +207,10 @@ void set_card_flipper_flipped() {
     card_flipping_servo.write(CARD_FLIPPER_INSERT);
 }
 
+void set_card_flipper_up() {
+    card_flipping_servo.write(90);
+}
+
 void rotate_platform(int target_degree) {
    int degree_to_move = abs(target_degree - current_degree);
    int how_much_to_move = round(100*degree_to_move/180);
@@ -212,7 +219,7 @@ void rotate_platform(int target_degree) {
         // Makes 200 pulses for making one full cycle rotation
         for(int x = 0; x < how_much_to_move; x++) {
             digitalWrite(STEPPER_STEP,HIGH); 
-            delay_busy(80); 
+            delay_busy(100); 
             digitalWrite(STEPPER_STEP,LOW); 
         }
    }
@@ -220,7 +227,7 @@ void rotate_platform(int target_degree) {
         digitalWrite(STEPPER_DIRECTION,LOW); //Changes the rotations direction
         for(int x = 0; x < how_much_to_move; x++) {
             digitalWrite(STEPPER_STEP,HIGH);
-            delay_busy(80);
+            delay_busy(100);
             digitalWrite(STEPPER_STEP,LOW);
         }
    }
@@ -244,7 +251,7 @@ int read_color_sensor(){
 
 int is_player_detected_and_range() {
     int range_to_player = read_proximity_sensor();
-    if (range_to_player <= 1000){ // 1.0 meters from players
+    if (range_to_player <= 1200){ // 1.0 meters from players
         return range_to_player;
     }
     return -1;
@@ -265,21 +272,23 @@ boolean is_card_facing_up() {
     digitalWrite(s2,HIGH);
     digitalWrite(s3,HIGH);
     int green_value = read_color_sensor();
-    Serial.print("green: ");
-    Serial.println(green_value);
-    Serial.print("blue: ");
-    Serial.println(red_value);
-    Serial.print("red: ");
-    Serial.println(blue_value);
+    // Serial.print("green: ");
+    // Serial.println(green_value);
+    // Serial.print("blue: ");
+    // Serial.println(red_value);
+    // Serial.print("red: ");
+    // Serial.println(blue_value);
     delay_busy(20);
+
     if (blue_value <= 27 and green_value <= 27 and red_value <= 27){
       if ((blue_value > 21 and green_value > 21 ) or (blue_value > 21 and red_value > 21) or (green_value > 21 and red_value > 21) ){
-        Serial.println("CARD FACING UP! ");
+     //Serial.println("CARD FACING UP! ");
        return true;
       }
-    Serial.println("CARD FACING DOWN! ");
-    return false;
+      //Serial.println("CARD FACING DOWN! ");
+      return false;
     }
+    //Serial.println("CARD FACING DOWN! ");
     return false;
 }
 
@@ -358,11 +367,11 @@ void detect_players() {
     send();
 
     num_of_players = 0;
+    for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++) player_angles[i] = -1;
 
     #ifndef DEBUG_DEALER
     for (int pos = 0; pos <= 180; pos += 18) { // goes from 180 degrees to 0 degrees - 18 degrees jump.
         rotate_platform(pos);
-        delay_busy(500);
         if(is_player_detected_and_range() != -1) {
             if (num_of_players >0 ){
                 if (player_angles[num_of_players-1] + 18 != pos){ //doesnt allow 2 players to be too close - at least 36 degrees between them.
@@ -499,6 +508,34 @@ void show_cards_round_3() {
     send();
 }
 
+void round_ended() {
+    set_card_flipper_regular();
+}
+
+void celebrate() {
+
+    info_logf("CELEB START");
+    machine_state = MACHINE_STATE_CELEBRATING;
+    set_is_working(true);
+    send();
+
+    set_card_flipper_up();
+    
+    digitalWrite(CARD_ACCELERATOR_1, LOW);
+    digitalWrite(CARD_ACCELERATOR_2, HIGH);
+    card_pusher_servo.write(60);
+    delay_busy(5000);
+    card_pusher_servo.write(90);
+    digitalWrite(CARD_ACCELERATOR_1, LOW);
+    digitalWrite(CARD_ACCELERATOR_2, LOW);
+
+    
+    machine_state = MACHINE_STATE_IDLE;
+    set_is_working(false);
+    info_logf("CELEB END");
+    send();
+}
+
 void player_quit(int player_idx) {
     player_angles[player_idx] = -1;
     num_of_players--;
@@ -549,13 +586,14 @@ void setup() {
  * Loop
  *********************************/
 void loop() {
+    
     if(server->command_available()) {
-        
+        // Serial.println(".");    
         int command = server->get_command();
         int arg1 = server->get_arg1();
         int arg2 = server->get_arg2();
 
-        #ifdef DEBUD_DEALER
+        #ifdef DEBUG_DEALER
         if(command != COMMAND_DO_NOTHING) {
             pinMode(LED_BUILTIN, OUTPUT);
             for(int i = 0; i< 10; i++) {
@@ -586,7 +624,13 @@ void loop() {
                 show_cards_round_2();
                 break;
             case COMMAND_SHOW_CARD_3:
-                show_cards_round_1();
+                show_cards_round_3();
+                break;
+            case COMMAND_ROUND_ENDED:
+                round_ended();
+                break;
+            case COMMAND_CELEBRATE:
+                celebrate();
                 break;
             case COMMAND_PLAYER_QUIT:
                 int player_idx = arg1;

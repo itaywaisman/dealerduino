@@ -4,7 +4,7 @@
 SerialServer::SerialServer() {
     this->serial = &Serial;
     for(int i = 0 ; i < LOG_LENGTH; i++) this->stored_log[i] = 0;
-    this->serial->begin(9600);
+    this->serial->begin(115200);
     
 }
 
@@ -90,7 +90,7 @@ void SerialServer::receive_bytes() {
 
     while (this->serial->available() > 0 && has_new_data == false) {
         rb = this->serial->read();
-
+        
         if (recvInProgress == true) {
             if (rb != endMarker) {
                 this->received_bytes[ndx] = rb;

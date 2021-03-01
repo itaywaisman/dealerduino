@@ -26,6 +26,7 @@
 #define MACHINE_STATE_DEALING_CARD_1          11
 #define MACHINE_STATE_DEALING_CARD_2          21
 #define MACHINE_STATE_DEALING_CARD_3          31
+#define MACHINE_STATE_CELEBRATING             555
 
 #define COMMAND_DO_NOTHING                  0
 #define COMMAND_START_GAME                  1
@@ -35,6 +36,7 @@
 #define COMMAND_SHOW_CARD_2                 5
 #define COMMAND_SHOW_CARD_3                 6
 #define COMMAND_ROUND_ENDED                 10
+#define COMMAND_CELEBRATE                   555
 #define COMMAND_PLAYER_QUIT                 998
 #define COMMAND_RESET                       999
 

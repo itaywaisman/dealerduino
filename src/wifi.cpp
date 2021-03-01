@@ -118,10 +118,13 @@ void print_log() {
 }
 
 void save_state() {
+
     int machine_state = client->get_machine_state();
     int game_state = client->get_game_state();
     int num_players = client->get_num_of_players();
     
+    if(machine_state == -1 || game_state == -1) return;
+
     Serial.printf("Current state: %d %d %d\n", machine_state, game_state, num_players);
 
     stateData.clear();
@@ -133,7 +136,7 @@ void save_state() {
         Serial.print("set /state failed:");
         Serial.println("REASON: " + fbdo.errorReason());
     }
-
+    client->flush_state();
 }
 
 void send_command() {
@@ -151,6 +154,8 @@ void send_command() {
         int arg1 = jsonData.intValue;
         data.get(jsonData, "arg2");
         int arg2 = jsonData.intValue;
+        
+        Serial.printf("sending command %d\n", command);
         
         client->set_command(command);
         client->set_arg1(arg1);

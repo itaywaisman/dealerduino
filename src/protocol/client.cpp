@@ -6,7 +6,7 @@ SerialClient::SerialClient(int rx, int tx)
     pinMode(tx, OUTPUT);
     pinMode(rx, INPUT);
     this->flush_log();
-    this->serial.begin(9600);
+    this->serial.begin(115200);
     
 }
 
@@ -77,6 +77,13 @@ char* SerialClient::get_log() {
 
 void SerialClient::flush_log() {
     for(int i = 0 ; i < LOG_LENGTH; i++) this->current_log[i] = 0;
+}
+
+void SerialClient::flush_state() {
+    this->current_game_state = -1;
+    this->current_machine_state = -1;
+    this->current_num_of_players = 0;
+    this->current_is_working = false;
 }
 
 void SerialClient::receive_bytes() {

@@ -86,7 +86,7 @@ class SerialClient {
         char* get_log();
         
         void flush_log();
-
+        void flush_state();
     private:
         SoftwareSerial serial;
 
