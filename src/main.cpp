@@ -180,9 +180,9 @@ void push_card_out_regular(){
     digitalWrite(CARD_ACCELERATOR_2, HIGH);
     delay_busy(300);
     card_pusher_servo.write(60);
-    delay_busy(470);
+    delay_busy(450);
     card_pusher_servo.write(90);
-    delay_busy(1400);
+    delay_busy(1450);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, LOW);
 }
@@ -192,9 +192,9 @@ void push_card_out_flipped(){
     digitalWrite(CARD_ACCELERATOR_2, HIGH);
     delay_busy(300);
     card_pusher_servo.write(60);
-    delay_busy(400);
+    delay_busy(380);
     card_pusher_servo.write(90);
-    delay_busy(1400);
+    delay_busy(1450);
     digitalWrite(CARD_ACCELERATOR_1, LOW);
     digitalWrite(CARD_ACCELERATOR_2, LOW);
 }
@@ -219,7 +219,7 @@ void rotate_platform(int target_degree) {
         // Makes 200 pulses for making one full cycle rotation
         for(int x = 0; x < how_much_to_move; x++) {
             digitalWrite(STEPPER_STEP,HIGH); 
-            delay_busy(100); 
+            delay_busy(110); 
             digitalWrite(STEPPER_STEP,LOW); 
         }
    }
@@ -227,7 +227,7 @@ void rotate_platform(int target_degree) {
         digitalWrite(STEPPER_DIRECTION,LOW); //Changes the rotations direction
         for(int x = 0; x < how_much_to_move; x++) {
             digitalWrite(STEPPER_STEP,HIGH);
-            delay_busy(100);
+            delay_busy(110);
             digitalWrite(STEPPER_STEP,LOW);
         }
    }
@@ -251,7 +251,7 @@ int read_color_sensor(){
 
 int is_player_detected_and_range() {
     int range_to_player = read_proximity_sensor();
-    if (range_to_player <= 1200){ // 1.0 meters from players
+    if (range_to_player <= 1200 && range_to_player >= 400 ){ // 1.0 meters from players
         return range_to_player;
     }
     return -1;
@@ -280,16 +280,12 @@ boolean is_card_facing_up() {
     // Serial.println(blue_value);
     delay_busy(20);
 
-    if (blue_value <= 27 and green_value <= 27 and red_value <= 27){
-      if ((blue_value > 21 and green_value > 21 ) or (blue_value > 21 and red_value > 21) or (green_value > 21 and red_value > 21) ){
-     //Serial.println("CARD FACING UP! ");
-       return true;
-      }
+    if (blue_value < 20 and green_value < 20 and red_value < 20){
       //Serial.println("CARD FACING DOWN! ");
       return false;
     }
-    //Serial.println("CARD FACING DOWN! ");
-    return false;
+    //Serial.println("CARD FACING UP! ");
+    return true;
 }
 
 void deal_regular(int target_angle) {
@@ -586,7 +582,7 @@ void setup() {
  * Loop
  *********************************/
 void loop() {
-    
+
     if(server->command_available()) {
         // Serial.println(".");    
         int command = server->get_command();
