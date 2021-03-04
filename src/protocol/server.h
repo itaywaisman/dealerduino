@@ -119,7 +119,17 @@ class SerialServer {
         void receive_bytes();
         bool validate_packet();
         void parse_bytes();
-        void send_bytes(uint8_t ack, uint8_t packet_num, uint8_t macine_state, uint8_t game_state, uint8_t is_working, uint8_t num_of_players, char* log);
+        void send_bytes(uint8_t ack,
+         uint8_t packet_num, 
+         uint8_t macine_state, 
+         uint8_t game_state, 
+         uint8_t is_working, 
+         uint8_t num_of_players,
+         uint8_t player1_angle,
+         uint8_t player2_angle,
+         uint8_t player3_angle,
+         uint8_t player4_angle,
+         char* log);
 };
 
 #endif

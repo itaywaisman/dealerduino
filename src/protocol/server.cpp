@@ -27,7 +27,15 @@ void SerialServer::sync() {
 }
 
 void SerialServer::send() {
-    this->send_bytes(0, rand(), this->stored_machine_state, this->stored_game_state, this->stored_is_working, this->stored_num_of_players, this->stored_log);
+    this->send_bytes(0, rand(), this->stored_machine_state, 
+    this->stored_game_state,
+    this->stored_is_working, 
+    this->stored_num_of_players, 
+    this->stored_player1_angle,
+    this->stored_player2_angle,
+    this->stored_player3_angle,
+    this->stored_player4_angle,
+    this->stored_log);
     this->stored_game_state = GAME_STATE_NOT_STARTED;
 }
 
