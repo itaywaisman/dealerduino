@@ -122,6 +122,10 @@ void save_state() {
     int machine_state = client->get_machine_state();
     int game_state = client->get_game_state();
     int num_players = client->get_num_of_players();
+    int player1_angle = client->get_player1_angle();
+    int player2_angle = client->get_player1_angle();
+    int player3_angle = client->get_player1_angle();
+    int player4_angle = client->get_player1_angle();
     
     if(machine_state == -1 || game_state == -1) return;
 
@@ -131,6 +135,11 @@ void save_state() {
     stateData.set("machine_state", machine_state);
     if(game_state != GAME_STATE_NOT_STARTED) stateData.set("game_state", game_state);
     stateData.set("player_num", num_players);
+
+    stateData.set("player1_angle", player1_angle);
+    stateData.set("player2_angle", player2_angle);
+    stateData.set("player3_angle", player3_angle);
+    stateData.set("player4_angle", player4_angle);
 
     if(!Firebase.updateNode(fbdo, "/state", stateData)) {
         Serial.print("set /state failed:");

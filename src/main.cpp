@@ -295,25 +295,25 @@ boolean is_card_facing_up() {
 void deal_regular(int target_angle) {
 
     rotate_platform(target_angle);
-    delay_busy(300);
+    delay_busy(100);
 
     set_card_flipper_regular();
     delay_busy(900);
     
     push_card_out_regular();
-    delay_busy(300);
+    delay_busy(100);
 }
 
 void deal_flipped(int target_angle) {
 
     rotate_platform((180 + target_angle) %360);
-    delay_busy(300);
+    delay_busy(100);
 
     set_card_flipper_flipped();
     delay_busy(900);
 
     push_card_out_flipped();
-    delay_busy(300);
+    delay_busy(100);
 }
 
 void deal_card(boolean is_open, int target_angle) {
@@ -631,6 +631,9 @@ void loop() {
                 break;
             case COMMAND_CELEBRATE:
                 celebrate();
+                break;
+            case COMMAND_DEAL_CARD:
+                deal_card(arg1 == 1, player_angles[arg2]);
                 break;
             case COMMAND_PLAYER_QUIT:
                 int player_idx = arg1;

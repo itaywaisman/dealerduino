@@ -37,8 +37,9 @@
 #define COMMAND_SHOW_CARD_3                 6
 #define COMMAND_ROUND_ENDED                 10
 #define COMMAND_CELEBRATE                   64
-#define COMMAND_PLAYER_QUIT                 998
-#define COMMAND_RESET                       999
+#define COMMAND_DEAL_CARD                   66
+#define COMMAND_PLAYER_QUIT                 100
+#define COMMAND_RESET                       101
 
 #define LOG_LENGTH 32
 
@@ -60,6 +61,10 @@ typedef struct __attribute__((__packed__)) server_packet_t {
     uint8_t game_state;
     uint8_t is_working;
     uint8_t num_of_players;
+    uint8_t player1_angle;
+    uint8_t player2_angle;
+    uint8_t player3_angle;
+    uint8_t player4_angle;
     char log[LOG_LENGTH];
 }* ServerPacket;
 

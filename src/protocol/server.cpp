@@ -70,6 +70,13 @@ void SerialServer::set_num_of_players(int num_of_players) {
     this->stored_num_of_players = num_of_players;
 }
 
+void SerialServer::set_angles(int player1_angle, int player2_angle, int player3_angle, int player4_angle) {
+    this->stored_player1_angle = player1_angle;
+    this->stored_player2_angle = player2_angle;
+    this->stored_player3_angle = player3_angle;
+    this->stored_player4_angle = player4_angle;
+}
+
 void SerialServer::set_log(char log[LOG_LENGTH]) {
     for(int i = 0 ; i < LOG_LENGTH; i++) this->stored_log[i] = log[i];
 }
@@ -166,7 +173,16 @@ void SerialServer::parse_bytes(){
     }
 }
 
-void SerialServer::send_bytes(uint8_t ack, uint8_t packet_num, uint8_t machine_state, uint8_t game_state, uint8_t is_working, uint8_t num_of_players, char* log) {
+void SerialServer::send_bytes(uint8_t ack, uint8_t packet_num, 
+    uint8_t machine_state,
+    uint8_t game_state,
+    uint8_t is_working,
+    uint8_t num_of_players,
+    uint8_t player1_angle,
+    uint8_t player2_angle,
+    uint8_t player3_angle,
+    uint8_t player4_angle,
+    char* log) {
     server_packet_t packet = {};
     packet.ack = ack;
     packet.packet_num = packet_num;
@@ -174,6 +190,10 @@ void SerialServer::send_bytes(uint8_t ack, uint8_t packet_num, uint8_t machine_s
     packet.game_state = game_state;
     packet.is_working = is_working;
     packet.num_of_players = num_of_players;
+    packet.player1_angle = player1_angle;
+    packet.player2_angle = player2_angle;
+    packet.player3_angle = player3_angle;
+    packet.player4_angle = player4_angle;
     for(int i = 0 ; i < LOG_LENGTH; i++) packet.log[i] = log[i];
     
     const byte* data = (byte*)&packet + sizeof(uint8_t); //skip packet_num and checksum values

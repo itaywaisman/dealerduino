@@ -64,6 +64,22 @@ int SerialClient::get_num_of_players() {
     return this->current_num_of_players;
 }
 
+int SerialClient::get_player1_angle() {
+    return this->current_player1_angle;
+}
+
+int SerialClient::get_player2_angle() {
+    return this->current_player2_angle;
+}
+
+int SerialClient::get_player3_angle() {
+    return this->current_player3_angle;
+}
+
+int SerialClient::get_player4_angle() {
+    return this->current_player4_angle;
+}
+
 bool SerialClient::has_log() {
     char* log = this->current_log;
     bool has_chars = false;
@@ -155,6 +171,10 @@ void SerialClient::parse_bytes(){
                 this->current_game_state = packet->game_state;
                 this->current_is_working = packet->is_working == 1;
                 this->current_num_of_players = packet->num_of_players;
+                this->current_player1_angle = packet->player1_angle;
+                this->current_player2_angle = packet->player2_angle;
+                this->current_player3_angle = packet->player3_angle;
+                this->current_player4_angle = packet->player4_angle;
                 for(int i = 0; i < LOG_LENGTH ; i++) this->current_log[i] = packet->log[i];
                 this->is_state_available = true;
 

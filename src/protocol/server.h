@@ -78,6 +78,8 @@ class SerialServer {
          */
         void set_num_of_players(int num_of_players);
 
+
+        void set_angles(int player1_angle, int player2_angle, int player3_angle, int player4_angle);
         /**
          * <desc>
          * Sets the log to send to the client
@@ -97,6 +99,10 @@ class SerialServer {
         int stored_game_state = GAME_STATE_NOT_STARTED;
         bool stored_is_working = false;
         int stored_num_of_players = 0;
+        int stored_player1_angle;
+        int stored_player2_angle;
+        int stored_player3_angle;
+        int stored_player4_angle;
         char stored_log[LOG_LENGTH];
 
         const byte numBytes = sizeof(client_packet_t);

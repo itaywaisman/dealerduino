@@ -69,6 +69,11 @@ class SerialClient {
          */
         int get_game_state();
 
+        int get_player1_angle();
+        int get_player2_angle();
+        int get_player3_angle();
+        int get_player4_angle();
+
         /**
          * <desc>
          * Returns true if the is_working flag equals 1
@@ -99,6 +104,10 @@ class SerialClient {
         int current_game_state = GAME_STATE_NOT_STARTED;
         bool current_is_working = false;
         int current_num_of_players = 0;
+        int current_player1_angle;
+        int current_player2_angle;
+        int current_player3_angle;
+        int current_player4_angle;
         char current_log[LOG_LENGTH];
 
         const byte numBytes = sizeof(server_packet_t);
