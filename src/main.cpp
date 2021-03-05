@@ -366,21 +366,17 @@ void detect_players() {
     for(int i = 0; i < MAX_NUM_OF_PLAYERS; i++) player_angles[i] = -1;
 
     #ifndef DEBUG_DEALER
-    for (int pos = 0; pos <= 180; pos += 18) { // goes from 180 degrees to 0 degrees - 18 degrees jump.
+    int indicator = 0;
+    for (int pos = 0; pos <= 180; pos += 9) { // goes from 180 degrees to 0 degrees - 9 degrees jump.
         rotate_platform(pos);
-        if(is_player_detected_and_range() != -1) {
-            if (num_of_players >0 ){
-                if (player_angles[num_of_players-1] + 18 != pos){ //doesnt allow 2 players to be too close - at least 36 degrees between them.
-                    player_angles[num_of_players] = pos;
-                    info_logf("DET [%d]", pos);
-                    num_of_players++;
-                }
-            }
-            else{
-                player_angles[num_of_players] = pos;
-                info_logf("DET [%d]", pos);
-                num_of_players++;
-            }
+        if(is_player_detected_and_range() != -1 && indicator == 0) {
+            player_angles[num_of_players] = pos;
+            info_logf("DET [%d]", pos);
+            num_of_players++;
+            indicator = 1;
+        }
+        else if (is_player_detected_and_range() == -1){
+            indicator = 0;
         }
         if (num_of_players == 4){
             break;
